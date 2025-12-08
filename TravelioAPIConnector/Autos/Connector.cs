@@ -246,7 +246,8 @@ public static class Connector
                 Categoria = datos.categoria,
                 Transmision = datos.transmision,
                 ValorPagado = datos.valor_pagado,
-                UriFactura = datos.uri_factura
+                
+
             };
         }
         else
