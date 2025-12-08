@@ -1,0 +1,108 @@
+﻿@model BookingMvcDotNet.Models.LoginViewModel
+@{
+    ViewData["Title"] = "Iniciar sesión";
+}
+
+<section class="container d-flex align-items-center justify-content-center py-5" style="min-height:calc(100vh - 140px)">
+    <div class="card shadow-sm p-4 w-100" style="max-width:420px">
+        <h2 class="mb-3 text-center fw-bold text-primary">Travelio</h2>
+        <h5 class="mb-4 text-center text-muted">Bienvenido de nuevo</h5>
+
+        <form asp-action="Login" method="post" novalidate>
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small"></div>
+
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label">Correo electrónico</label>
+                <input asp-for="Email" class="form-control"
+                       placeholder="nombre@ejemplo.com"
+                       maxlength="100"
+                       autocomplete="email" />
+                <span asp-validation-for="Email" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="Password" class="form-label">Contraseña</label>
+                <div class="input-group">
+                    <input asp-for="Password" class="form-control" id="Password"
+                           placeholder="••••••••"
+                           maxlength="100" />
+                    <button class="btn btn-outline-secondary" type="button" id="togglePwd">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+                <span asp-validation-for="Password" class="text-danger small"></span>
+            </div>
+
+            <button class="btn btn-primary w-100 py-2 fw-bold" type="submit">Iniciar sesión</button>
+        </form>
+
+        <hr class="my-4" />
+        <p class="text-center mb-0">
+            ¿Nuevo aquí? <a asp-action="Register" class="fw-bold text-decoration-none">Crear cuenta</a>
+        </p>
+    </div>
+</section>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+
+            // ============================
+            // 1. Bloquear espacios en Email y Password
+            // ============================
+            function blockNoSpaces(input) {
+                if (!input) return;
+
+                input.addEventListener("keydown", function (e) {
+                    if (e.key === " ") {
+                        e.preventDefault();
+                    }
+                });
+
+                input.addEventListener("input", function () {
+                    if (/\s/.test(this.value)) {
+                        this.value = this.value.replace(/\s+/g, "");
+                    }
+                });
+            }
+
+            const emailInput = document.getElementById("Email");     // generado por asp-for
+            const pwdInput   = document.getElementById("Password");
+
+            // Convertir correo a minúsculas automáticamente
+            emailInput.addEventListener("input", function () {
+                this.value = this.value.toLowerCase();
+            });
+
+            blockNoSpaces(emailInput);
+            blockNoSpaces(pwdInput);
+
+            // ============================
+            // 2. Toggle mostrar/ocultar contraseña
+            // ============================
+            const toggleBtn = document.getElementById("togglePwd");
+
+            if (toggleBtn && pwdInput) {
+                toggleBtn.addEventListener("click", function () {
+                    const icon = this.querySelector("i");
+
+                    if (pwdInput.type === "password") {
+                        pwdInput.type = "text";
+                        if (icon) {
+                            icon.classList.remove("bi-eye");
+                            icon.classList.add("bi-eye-slash");
+                        }
+                    } else {
+                        pwdInput.type = "password";
+                        if (icon) {
+                            icon.classList.remove("bi-eye-slash");
+                            icon.classList.add("bi-eye");
+                        }
+                    }
+                });
+            }
+
+        })();
+    </script>
+}

@@ -1,0 +1,516 @@
+﻿@model BookingMvcDotNet.Models.ResultsViewModel
+
+@{
+    ViewData["Title"] = "Inicio";
+}
+
+@section Styles {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+    <style>
+        .hero-section {
+            position: relative;
+            height: 450px;
+            overflow: hidden;
+        }
+        .hero-section img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(0.65);
+        }
+        .hero-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            width: 90%;
+        }
+        .search-card {
+            position: relative;
+            z-index: 10;
+            margin-top: -50px;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.15);
+            padding: 30px;
+        }
+        .module-card {
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .module-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+        .module-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .featured-card {
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .featured-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+        }
+        .featured-img {
+            height: 180px;
+            object-fit: cover;
+        }
+        .featured-placeholder {
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+        }
+        .badge-discount {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        .badge-provider {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 2rem;
+            color: white;
+        }
+    </style>
+}
+
+<!-- Hero Section -->
+<div class="hero-section">
+    <img src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=2000&q=80"
+         alt="Viajes" />
+    <div class="hero-content">
+        <h1 class="display-4 fw-bold mb-3"><i class="bi bi-globe-americas"></i> Tu próxima aventura comienza aquí</h1>
+        <p class="fs-5 fw-light mb-0">Hoteles, vuelos, autos, restaurantes y paquetes turísticos. Todo integrado.</p>
+    </div>
+</div>
+
+<!-- Barra de búsqueda -->
+<div class="container" style="max-width: 1000px;">
+    <div class="search-card">
+        <form class="row g-3 align-items-end" asp-controller="Home" asp-action="Results" method="get">
+            <div class="col-md-5">
+                <label class="form-label small fw-bold text-muted"><i class="bi bi-search"></i> ¿A dónde vas?</label>
+                <input type="text" class="form-control form-control-lg" name="q" placeholder="Ciudad o destino...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-muted"><i class="bi bi-calendar3"></i> Fecha</label>
+                <input type="date" class="form-control form-control-lg" name="checkIn" min="@DateTime.Today.ToString("yyyy-MM-dd")">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold text-muted"><i class="bi bi-box"></i> Tipo</label>
+                <select class="form-select form-select-lg" name="tipo">
+                    <option value="">Todos</option>
+                    <option value="HOTEL">Hoteles</option>
+                    <option value="FLIGHT">Vuelos</option>
+                    <option value="CAR">Autos</option>
+                    <option value="RESTAURANT">Restaurantes</option>
+                    <option value="PACKAGE">Paquetes</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">
+                    Buscar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Módulos Principales -->
+<section class="container py-5">
+    <div class="text-center mb-5">
+        <h2 class="fw-bold"><i class="bi bi-rocket-takeoff text-primary"></i> Explora nuestros servicios</h2>
+        <p class="text-muted">5 módulos integrados con proveedores reales vía SOAP</p>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-6 col-lg">
+            <a asp-controller="Hoteles" asp-action="Index" class="text-decoration-none">
+                <div class="card module-card text-center p-4 h-100" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                    <div class="module-icon text-white"><i class="bi bi-building"></i></div>
+                    <h5 class="fw-bold text-white mb-1">Hoteles</h5>
+                    <small class="text-white-50">6 proveedores</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg">
+            <a asp-controller="Vuelos" asp-action="Index" class="text-decoration-none">
+                <div class="card module-card text-center p-4 h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <div class="module-icon text-white"><i class="bi bi-airplane"></i></div>
+                    <h5 class="fw-bold text-white mb-1">Vuelos</h5>
+                    <small class="text-white-50">5 aerolíneas</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg">
+            <a asp-controller="Autos" asp-action="Index" class="text-decoration-none">
+                <div class="card module-card text-center p-4 h-100" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <div class="module-icon text-white"><i class="bi bi-car-front"></i></div>
+                    <h5 class="fw-bold text-white mb-1">Autos</h5>
+                    <small class="text-white-50">6 rentadoras</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg">
+            <a asp-controller="Restaurantes" asp-action="Index" class="text-decoration-none">
+                <div class="card module-card text-center p-4 h-100" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <div class="module-icon text-white"><i class="bi bi-cup-straw"></i></div>
+                    <h5 class="fw-bold text-white mb-1">Restaurantes</h5>
+                    <small class="text-white-50">7 restaurantes</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg">
+            <a asp-controller="Paquetes" asp-action="Index" class="text-decoration-none">
+                <div class="card module-card text-center p-4 h-100" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+                    <div class="module-icon"><i class="bi bi-backpack2"></i></div>
+                    <h5 class="fw-bold mb-1">Paquetes</h5>
+                    <small class="text-muted">3 agencias</small>
+                </div>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Estadísticas -->
+<section class="container mb-5">
+    <div class="stats-card">
+        <div class="row text-center">
+            <div class="col-md-3 col-6 mb-3 mb-md-0">
+                <h2 class="fw-bold mb-0">27+</h2>
+                <small class="opacity-75">Proveedores SOAP</small>
+            </div>
+            <div class="col-md-3 col-6 mb-3 mb-md-0">
+                <h2 class="fw-bold mb-0">5</h2>
+                <small class="opacity-75">Tipos de servicio</small>
+            </div>
+            <div class="col-md-3 col-6">
+                <h2 class="fw-bold mb-0">100%</h2>
+                <small class="opacity-75">Integración SOA</small>
+            </div>
+            <div class="col-md-3 col-6">
+                <h2 class="fw-bold mb-0">24/7</h2>
+                <small class="opacity-75">Disponible</small>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Destacados con imágenes reales -->
+<section class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-fire text-danger"></i> Ofertas Destacadas</h3>
+            <p class="text-muted mb-0">Vehículos con imágenes reales de nuestros proveedores</p>
+        </div>
+        <a asp-controller="Autos" asp-action="Index" class="btn btn-outline-primary">Ver todos <i class="bi bi-arrow-right"></i></a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Vehículos con URLs de Cloudinary (reales del SOAP) -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card featured-card h-100">
+                <div class="position-relative">
+                    <img src="https://res.cloudinary.com/drtkbiece/image/upload/v1763875445/6_d3i7ra.jpg" 
+                         class="card-img-top featured-img" alt="Kia Sportage"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="featured-placeholder bg-primary" style="display:none;">
+                        <i class="bi bi-car-front text-white" style="font-size: 3rem;"></i>
+                    </div>
+                    <span class="badge bg-success badge-provider">Cuenca Wheels</span>
+                </div>
+                <div class="card-body">
+                    <h6 class="fw-bold mb-1">Kia Sportage SUV Premium</h6>
+                    <p class="text-muted small mb-2"><i class="bi bi-geo-alt"></i> Sucursal Mall del Sol, Ecuador</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fw-bold text-primary fs-5">$20.00</span>
+                            <small class="text-muted">/día</small>
+                        </div>
+                        <a asp-controller="Autos" asp-action="Index" class="btn btn-sm btn-primary">Ver más</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <div class="card featured-card h-100">
+                <div class="position-relative">
+                    <img src="https://res.cloudinary.com/drtkbiece/image/upload/v1763875760/5_kvhhw4.jpg" 
+                         class="card-img-top featured-img" alt="Toyota Yaris"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="featured-placeholder bg-warning" style="display:none;">
+                        <i class="bi bi-car-front text-white" style="font-size: 3rem;"></i>
+                    </div>
+                    <span class="badge bg-success badge-provider">Cuenca Wheels</span>
+                </div>
+                <div class="card-body">
+                    <h6 class="fw-bold mb-1">Toyota Yaris Económico</h6>
+                    <p class="text-muted small mb-2"><i class="bi bi-geo-alt"></i> Sucursal Mall del Sol, Ecuador</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fw-bold text-primary fs-5">$35.00</span>
+                            <small class="text-muted">/día</small>
+                        </div>
+                        <a asp-controller="Autos" asp-action="Index" class="btn btn-sm btn-primary">Ver más</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <div class="card featured-card h-100">
+                <div class="position-relative">
+                    <div class="featured-placeholder" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="bi bi-car-front text-white" style="font-size: 3rem;"></i>
+                    </div>
+                    <span class="badge bg-info badge-provider">LojitaGO</span>
+                </div>
+                <div class="card-body">
+                    <h6 class="fw-bold mb-1">Kia Rio Sedan Económico</h6>
+                    <p class="text-muted small mb-2"><i class="bi bi-geo-alt"></i> Ecuador</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="fw-bold text-primary fs-5">$38.00</span>
+                            <small class="text-muted">/día</small>
+                        </div>
+                        <a asp-controller="Autos" asp-action="Index" class="btn btn-sm btn-primary">Ver más</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Sección de Hoteles -->
+<section class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-building text-success"></i> Hoteles Populares</h3>
+            <p class="text-muted mb-0">Habitaciones de 6 hoteles integrados</p>
+        </div>
+        <a asp-controller="Hoteles" asp-action="Index" class="btn btn-outline-success">Ver todos <i class="bi bi-arrow-right"></i></a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="card featured-card h-100">
+                <div class="featured-placeholder" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                    <i class="bi bi-building text-white" style="font-size: 3rem;"></i>
+                </div>
+                <div class="card-body text-center">
+                    <h6 class="fw-bold mb-1">Hotel Campestre</h6>
+                    <small class="text-muted">SOAP Integrado</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card featured-card h-100">
+                <div class="featured-placeholder" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="bi bi-building text-white" style="font-size: 3rem;"></i>
+                </div>
+                <div class="card-body text-center">
+                    <h6 class="fw-bold mb-1">AllpahouseNYC</h6>
+                    <small class="text-muted">SOAP Integrado</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card featured-card h-100">
+                <div class="featured-placeholder" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <i class="bi bi-building text-white" style="font-size: 3rem;"></i>
+                </div>
+                <div class="card-body text-center">
+                    <h6 class="fw-bold mb-1">Brisamar</h6>
+                    <small class="text-muted">SOAP Integrado</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card featured-card h-100">
+                <div class="featured-placeholder" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <i class="bi bi-building text-white" style="font-size: 3rem;"></i>
+                </div>
+                <div class="card-body text-center">
+                    <h6 class="fw-bold mb-1">Hotel Andino</h6>
+                    <small class="text-muted">SOAP Integrado</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Aerolíneas -->
+<section class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-airplane text-warning"></i> Aerolíneas Integradas</h3>
+            <p class="text-muted mb-0">5 aerolíneas con reservas en tiempo real</p>
+        </div>
+        <a asp-controller="Vuelos" asp-action="Index" class="btn btn-outline-warning">Ver vuelos <i class="bi bi-arrow-right"></i></a>
+    </div>
+
+    <div class="row g-3">
+        <div class="col">
+            <div class="card text-center p-3 border-0 shadow-sm">
+                <div><i class="bi bi-airplane text-primary" style="font-size: 2rem;"></i></div>
+                <small class="fw-bold">Withfly</small>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card text-center p-3 border-0 shadow-sm">
+                <div><i class="bi bi-airplane text-danger" style="font-size: 2rem;"></i></div>
+                <small class="fw-bold">Astrawings</small>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card text-center p-3 border-0 shadow-sm">
+                <div><i class="bi bi-airplane text-info" style="font-size: 2rem;"></i></div>
+                <small class="fw-bold">SkaywardAir</small>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card text-center p-3 border-0 shadow-sm">
+                <div><i class="bi bi-airplane text-success" style="font-size: 2rem;"></i></div>
+                <small class="fw-bold">SkyAndes</small>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card text-center p-3 border-0 shadow-sm">
+                <div><i class="bi bi-airplane text-warning" style="font-size: 2rem;"></i></div>
+                <small class="fw-bold">Caribbean</small>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Restaurantes -->
+<section class="container pb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-cup-straw text-danger"></i> Restaurantes</h3>
+            <p class="text-muted mb-0">7 restaurantes para reservar mesas</p>
+        </div>
+        <a asp-controller="Restaurantes" asp-action="Index" class="btn btn-outline-danger">Ver restaurantes <i class="bi bi-arrow-right"></i></a>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card p-3 border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                        <i class="bi bi-cup-straw text-white"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">Cangrejitos Felices</h6>
+                        <small class="text-muted">Mariscos</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3 border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-warning rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                        <i class="bi bi-cup-hot text-white"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">Dragón Rojo</h6>
+                        <small class="text-muted">Asiático</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3 border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-purple rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; background: #764ba2;">
+                        <i class="bi bi-cup text-white"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">Sánctum</h6>
+                        <small class="text-muted">Gourmet</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3 border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-success rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                        <i class="bi bi-tree text-white"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">Sabor Andino</h6>
+                        <small class="text-muted">Típico</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3 border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-dark rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                        <i class="bi bi-music-note-beamed text-white"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">Bar Sinson</h6>
+                        <small class="text-muted">Bar & Grill</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3 border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-info rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                        <i class="bi bi-water text-white"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">7 Mares</h6>
+                        <small class="text-muted">Mariscos</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action -->
+<section class="container pb-5">
+    <div class="card border-0 text-white text-center p-5" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px;">
+        <h2 class="fw-bold mb-3">¿Listo para tu próximo viaje? <i class="bi bi-sun"></i></h2>
+        <p class="fs-5 mb-4 opacity-90">Más de 27 proveedores integrados esperando por ti</p>
+        <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a asp-controller="Home" asp-action="Register" class="btn btn-light btn-lg px-5 fw-bold">
+                <i class="bi bi-rocket"></i> Crear cuenta gratis
+            </a>
+            <a asp-controller="Home" asp-action="Modules" class="btn btn-outline-light btn-lg px-5">
+                Ver todos los módulos
+            </a>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+}

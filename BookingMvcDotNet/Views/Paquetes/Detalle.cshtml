@@ -1,0 +1,202 @@
+@model BookingMvcDotNet.Models.PaqueteDetalleViewModel
+@{
+    ViewData["Title"] = Model.Nombre;
+}
+
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Inicio</a></li>
+            <li class="breadcrumb-item"><a asp-controller="Paquetes" asp-action="Index">Paquetes</a></li>
+            <li class="breadcrumb-item active">@Model.Nombre</li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0">
+                @if (!string.IsNullOrEmpty(Model.ImagenUrl))
+                {
+                    <img src="@Model.ImagenUrl" class="card-img-top" alt="@Model.Nombre"
+                         style="height: 400px; object-fit: cover;">
+                }
+                else
+                {
+                    <div class="d-flex align-items-center justify-content-center" 
+                         style="height: 400px; background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%);">
+                        <span style="font-size: 10rem;">??</span>
+                    </div>
+                }
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h2 class="fw-bold mb-1">@Model.Nombre</h2>
+                            <p class="text-muted mb-2">?? @Model.Ciudad, @Model.Pais</p>
+                            <span class="badge bg-success">@Model.NombreProveedor</span>
+                        </div>
+                        @if (Model.TieneDescuento)
+                        {
+                            <span class="badge bg-danger fs-6">-@Model.DescuentoPorcentaje.ToString("0")% OFF</span>
+                        }
+                    </div>
+
+                    <div class="row g-3 mt-3">
+                        <div class="col-md-3">
+                            <div class="bg-light rounded p-3 text-center">
+                                <div style="font-size: 2rem;">??</div>
+                                <div class="fw-bold">@Model.Duracion días</div>
+                                <small class="text-muted">Duración</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="bg-light rounded p-3 text-center">
+                                <div style="font-size: 2rem;">??</div>
+                                <div class="fw-bold">@Model.Capacidad máx</div>
+                                <small class="text-muted">Personas</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="bg-light rounded p-3 text-center">
+                                <div style="font-size: 2rem;">???</div>
+                                <div class="fw-bold">@Model.TipoActividad</div>
+                                <small class="text-muted">Tipo</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="bg-light rounded p-3 text-center">
+                                <div style="font-size: 2rem;">??</div>
+                                <div class="fw-bold text-success">$@Model.PrecioActual.ToString("N2")</div>
+                                <small class="text-muted">Por persona</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow border-0 sticky-top" style="top: 2rem;">
+                <div class="card-body p-4">
+                    <h4 class="fw-bold mb-3">?? Reservar paquete</h4>
+
+                    <div class="bg-light rounded p-3 mb-4">
+                        @if (Model.TieneDescuento)
+                        {
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="text-decoration-line-through text-muted">$@Model.PrecioNormal.ToString("N2")</span>
+                                <span class="badge bg-danger">-@Model.DescuentoPorcentaje.ToString("0")%</span>
+                            </div>
+                        }
+                        <div class="d-flex align-items-baseline gap-2">
+                            <span class="h2 fw-bold text-success mb-0">$@Model.PrecioActual.ToString("N2")</span>
+                            <span class="text-muted">/ persona</span>
+                        </div>
+                    </div>
+
+                    <form id="reserva-form">
+                        <input type="hidden" id="servicioId" value="@Model.ServicioId" />
+                        <input type="hidden" id="idPaquete" value="@Model.IdPaquete" />
+                        <input type="hidden" id="precioUnitario" value="@Model.PrecioActual" />
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Fecha de inicio</label>
+                            <input type="date" class="form-control" id="fechaInicio" 
+                                   value="@Model.FechaInicio?.ToString("yyyy-MM-dd")"
+                                   min="@DateTime.Today.ToString("yyyy-MM-dd")">
+                            <small class="text-muted">Duración: @Model.Duracion días</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Número de personas</label>
+                            <select class="form-select" id="personas">
+                                @for (int i = 1; i <= Model.Capacidad; i++)
+                                {
+                                    <option value="@i" selected="@(i == Model.NumeroPersonas)">
+                                        @i @(i == 1 ? "persona" : "personas")
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="border-top pt-3 mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">$@Model.PrecioActual.ToString("N2") x <span id="numPersonas">@Model.NumeroPersonas</span> persona(s)</span>
+                                <span id="precioSubtotal">$@Model.PrecioTotal.ToString("N2")</span>
+                            </div>
+                            <div class="d-flex justify-content-between fw-bold fs-5">
+                                <span>Total</span>
+                                <span class="text-success" id="precioTotal">$@Model.PrecioTotal.ToString("N2")</span>
+                            </div>
+                        </div>
+
+                        <button type="button" id="btn-agregar" class="btn btn-success w-100 btn-lg fw-bold">
+                            ?? Reservar paquete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const personas = document.getElementById('personas');
+            const precioUnitario = parseFloat(document.getElementById('precioUnitario').value);
+            const numPersonasEl = document.getElementById('numPersonas');
+            const precioSubtotalEl = document.getElementById('precioSubtotal');
+            const precioTotalEl = document.getElementById('precioTotal');
+            const btnAgregar = document.getElementById('btn-agregar');
+
+            function calcularPrecio() {
+                const num = parseInt(personas.value);
+                const total = precioUnitario * num;
+                numPersonasEl.textContent = num;
+                precioSubtotalEl.textContent = '$' + total.toFixed(2);
+                precioTotalEl.textContent = '$' + total.toFixed(2);
+            }
+
+            personas.addEventListener('change', calcularPrecio);
+
+            btnAgregar.addEventListener('click', function() {
+                const formData = new FormData();
+                formData.append('servicioId', document.getElementById('servicioId').value);
+                formData.append('idPaquete', document.getElementById('idPaquete').value);
+                formData.append('fechaInicio', document.getElementById('fechaInicio').value);
+                formData.append('personas', personas.value);
+
+                btnAgregar.disabled = true;
+                btnAgregar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verificando...';
+
+                fetch('@Url.Action("AgregarAlCarrito", "Paquetes")', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(data => {
+                    btnAgregar.disabled = false;
+                    btnAgregar.innerHTML = '?? Reservar paquete';
+
+                    if (data.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Agregado!',
+                            text: data.message,
+                            showCancelButton: true,
+                            confirmButtonText: 'Ir al carrito',
+                            cancelButtonText: 'Seguir buscando'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.location.href = '@Url.Action("Carrito", "Home")';
+                            }
+                        });
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                });
+            });
+        });
+    </script>
+}

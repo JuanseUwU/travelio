@@ -1,0 +1,317 @@
+﻿@model BookingMvcDotNet.Models.RegisterViewModel
+
+@{
+    ViewData["Title"] = "Crear cuenta";
+}
+
+<section class="container d-flex align-items-center justify-content-center py-5"
+         style="min-height:calc(100vh - 140px)">
+    <div class="card shadow-sm p-4 w-100" style="max-width:600px">
+        <h2 class="mb-3 text-center">Crear cuenta</h2>
+
+        <form asp-action="Register" method="post" novalidate id="register-form">
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="has-validation">
+                        <label asp-for="Nombre" class="form-label"></label>
+                        <input asp-for="Nombre" class="form-control" autocomplete="given-name" />
+                        <span asp-validation-for="Nombre" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="has-validation">
+                        <label asp-for="Apellido" class="form-label"></label>
+                        <input asp-for="Apellido" class="form-control" autocomplete="family-name" />
+                        <span asp-validation-for="Apellido" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="has-validation">
+                        <label asp-for="Email" class="form-label"></label>
+                        <input asp-for="Email" class="form-control" id="Email"
+                               autocomplete="email" spellcheck="false" />
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="has-validation">
+                        <label asp-for="TipoIdentificacion" class="form-label"></label>
+                        <select asp-for="TipoIdentificacion" class="form-select" id="TipoIdentificacion">
+                            <option value="Cedula">Cédula (10 dígitos)</option>
+                            <option value="Pasaporte">Pasaporte (alfanumérico)</option>
+                            <option value="RUC">RUC (13 dígitos)</option>
+                        </select>
+                        <span asp-validation-for="TipoIdentificacion" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="has-validation">
+                        <label asp-for="DocumentoIdentidad" class="form-label"></label>
+                        <input asp-for="DocumentoIdentidad" class="form-control" id="DocumentoIdentidad" 
+                               placeholder="Ej: 0105123456" maxlength="13" />
+                        <span asp-validation-for="DocumentoIdentidad" class="text-danger small"></span>
+                        <small class="text-muted" id="docHint">10 dígitos numéricos</small>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="has-validation">
+                        <label asp-for="FechaNacimiento" class="form-label"></label>
+                        <input asp-for="FechaNacimiento" type="date" class="form-control" 
+                               max="@DateTime.Today.AddYears(-18).ToString("yyyy-MM-dd")" />
+                        <span asp-validation-for="FechaNacimiento" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="has-validation">
+                        <label asp-for="Telefono" class="form-label"></label>
+                        <input asp-for="Telefono" class="form-control" id="Telefono" 
+                               placeholder="Ej: 0991234567" maxlength="10" inputmode="numeric" />
+                        <span asp-validation-for="Telefono" class="text-danger small"></span>
+                        <small class="text-muted">10 dígitos numéricos</small>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="has-validation">
+                        <label asp-for="Pais" class="form-label"></label>
+                        <select asp-for="Pais" class="form-select">
+                            <option value="">Seleccionar país...</option>
+                            <option value="Ecuador">Ecuador</option>
+                            <option value="Colombia">Colombia</option>
+                            <option value="Perú">Perú</option>
+                            <option value="México">México</option>
+                            <option value="Argentina">Argentina</option>
+                            <option value="Chile">Chile</option>
+                            <option value="España">España</option>
+                            <option value="Estados Unidos">Estados Unidos</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                        <span asp-validation-for="Pais" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="has-validation">
+                        <label asp-for="Password" class="form-label"></label>
+                        <div class="input-group">
+                            <input asp-for="Password" class="form-control"
+                                   autocomplete="new-password" id="Password" />
+                            <button class="btn btn-outline-secondary" type="button" id="togglePwd">👁</button>
+                        </div>
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+
+                    <div class="form-text mt-1">
+                        Mín. 8 caracteres con mayúscula, minúscula, número y símbolo.
+                    </div>
+
+                    <div class="progress mt-2" style="height:8px">
+                        <div id="pwd-meter" class="progress-bar" style="width:0%"></div>
+                    </div>
+
+                    <div id="pwdTips" class="small mt-2">
+                        <span data-k="len" class="text-danger">• 8+ caracteres</span><br />
+                        <span data-k="lower" class="text-danger">• minúscula</span><br />
+                        <span data-k="upper" class="text-danger">• mayúscula</span><br />
+                        <span data-k="digit" class="text-danger">• número</span><br />
+                        <span data-k="symbol" class="text-danger">• símbolo</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary w-100 mt-3" type="submit">Crear cuenta</button>
+        </form>
+
+        <p class="text-center mt-3 mb-0">
+            ¿Ya tienes cuenta? <a asp-controller="Home" asp-action="Login">Iniciar sesión</a>
+        </p>
+    </div>
+</section>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        (function () {
+            const pwd = document.getElementById("Password");
+            const toggle = document.getElementById("togglePwd");
+            const meter = document.getElementById("pwd-meter");
+            const formEl = document.getElementById("register-form");
+            const tipsRoot = document.getElementById("pwdTips");
+            const tipoDoc = document.getElementById("TipoIdentificacion");
+            const docInput = document.getElementById("DocumentoIdentidad");
+            const docHint = document.getElementById("docHint");
+            const telefonoInput = document.getElementById("Telefono");
+
+            // ===================================
+            // 0. Bloquear caracteres no permitidos
+            // ===================================
+            
+            // Solo permite dígitos numéricos
+            function onlyNumbers(input) {
+                if (!input) return;
+                input.addEventListener("input", function () {
+                    this.value = this.value.replace(/\D/g, "");
+                });
+                input.addEventListener("keypress", function (e) {
+                    if (!/\d/.test(e.key)) {
+                        e.preventDefault();
+                    }
+                });
+            }
+
+            // Solo permite letras y números (para pasaporte)
+            function alphanumeric(input) {
+                if (!input) return;
+                input.addEventListener("input", function () {
+                    this.value = this.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+                });
+                input.addEventListener("keypress", function (e) {
+                    if (!/[A-Za-z0-9]/.test(e.key)) {
+                        e.preventDefault();
+                    }
+                });
+            }
+
+            // Teléfono: siempre solo números
+            onlyNumbers(telefonoInput);
+
+            // Documento: depende del tipo seleccionado
+            function updateDocValidation() {
+                if (!tipoDoc || !docInput || !docHint) return;
+                
+                const tipo = tipoDoc.value;
+                
+                // Limpiar listeners previos clonando el elemento
+                const newInput = docInput.cloneNode(true);
+                docInput.parentNode.replaceChild(newInput, docInput);
+                
+                // Re-asignar referencia
+                const updatedInput = document.getElementById("DocumentoIdentidad");
+                
+                if (tipo === "Cedula") {
+                    updatedInput.maxLength = 10;
+                    updatedInput.placeholder = "Ej: 0105123456";
+                    docHint.textContent = "10 dígitos numéricos";
+                    onlyNumbers(updatedInput);
+                } else if (tipo === "RUC") {
+                    updatedInput.maxLength = 13;
+                    updatedInput.placeholder = "Ej: 0105123456001";
+                    docHint.textContent = "13 dígitos numéricos";
+                    onlyNumbers(updatedInput);
+                } else if (tipo === "Pasaporte") {
+                    updatedInput.maxLength = 20;
+                    updatedInput.placeholder = "Ej: AB123456";
+                    docHint.textContent = "6-20 caracteres alfanuméricos";
+                    alphanumeric(updatedInput);
+                }
+                
+                // Limpiar el valor actual si no cumple con el nuevo formato
+                updatedInput.value = "";
+            }
+
+            // Inicializar validación del documento
+            updateDocValidation();
+            
+            // Cambiar validación cuando cambia el tipo de documento
+            if (tipoDoc) {
+                tipoDoc.addEventListener("change", updateDocValidation);
+            }
+
+            // ===================================
+            // 1. Medidor de contraseña
+            // ===================================
+            if (!pwd || !toggle || !meter || !formEl) return;
+
+            function setTip(key, ok) {
+                if (!tipsRoot) return;
+                const el = tipsRoot.querySelector('[data-k="' + key + '"]');
+                if (!el) return;
+                el.classList.toggle("text-danger", !ok);
+                el.classList.toggle("text-success", ok);
+            }
+
+            function scorePassword(s) {
+                const hasLower = /[a-z]/.test(s);
+                const hasUpper = /[A-Z]/.test(s);
+                const hasDigit = /\d/.test(s);
+                const hasSymbol = /[^A-Za-z0-9]/.test(s);
+                const long8 = s.length >= 8;
+
+                setTip("len", long8);
+                setTip("lower", hasLower);
+                setTip("upper", hasUpper);
+                setTip("digit", hasDigit);
+                setTip("symbol", hasSymbol);
+
+                let score = 0;
+                if (long8) score++;
+                if (hasLower) score++;
+                if (hasUpper) score++;
+                if (hasDigit) score++;
+                if (hasSymbol) score++;
+                return score;
+            }
+
+            function updateMeter() {
+                const s = pwd.value || "";
+                const sc = scorePassword(s);
+                const pct = [0, 20, 40, 60, 80, 100][Math.min(sc, 5)];
+                meter.style.width = pct + "%";
+                meter.className = "progress-bar " +
+                    (sc <= 2 ? "bg-danger" : sc <= 4 ? "bg-warning" : "bg-success");
+            }
+
+            toggle.addEventListener("click", function () {
+                pwd.type = pwd.type === "password" ? "text" : "password";
+            });
+
+            pwd.addEventListener("input", updateMeter);
+
+            // Convertir correo a minúsculas automáticamente
+            document.getElementById("Email")?.addEventListener("input", function () {
+                this.value = this.value.toLowerCase();
+            });
+
+            // ===================================
+            // 2. Configuración de Validación jQuery Unobtrusive
+            // ===================================
+            if (!window.jQuery || !window.jQuery.validator || !window.jQuery.validator.unobtrusive) return;
+
+            var $form = window.jQuery("#register-form");
+
+            window.jQuery.validator.setDefaults({
+                highlight: function (element) {
+                    window.jQuery(element).addClass("is-invalid").removeClass("is-valid");
+                },
+                unhighlight: function (element) {
+                    window.jQuery(element).removeClass("is-invalid").addClass("is-valid");
+                }
+            });
+
+            $form.removeData("validator").removeData("unobtrusiveValidation");
+            window.jQuery.validator.unobtrusive.parse($form);
+
+            // Validar en tiempo real
+            $form.find("input:not([type='hidden'])").on("input blur", function (e) {
+                var $input = window.jQuery(this);
+                if (e.type === "input" && !$input.val()) {
+                    $input.removeClass("is-valid is-invalid");
+                    return;
+                }
+                $input.valid();
+            });
+
+        })();
+    </script>
+}

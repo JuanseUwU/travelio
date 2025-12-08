@@ -1,0 +1,80 @@
+﻿@{
+    ViewData["Title"] = "Paquetes turísticos";
+}
+
+<section class="py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Módulo de Paquetes turísticos</h2>
+            <p class="text-muted mb-0 small">
+                Aquí se integran de forma unificada los servicios de hoteles, vuelos, autos y
+                restaurantes para construir paquetes completos.
+            </p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Descripción del módulo</h5>
+            <p class="card-text text-muted small mb-0">
+                Este módulo está pensado para consumir la información consolidada de los otros
+                servicios (SOA / REST) y presentar al usuario paquetes turísticos que incluyan:
+            </p>
+            <ul class="text-muted small mb-0">
+                <li>Hospedaje (módulo de Hoteles).</li>
+                <li>Vuelos (módulo de Vuelos).</li>
+                <li>Autos de alquiler (módulo de Autos).</li>
+                <li>Restaurantes o experiencias gastronómicas (módulo de Restaurantes).</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <h5 class="card-title">Paquetes de ejemplo (demo)</h5>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="border rounded-3 p-3 h-100">
+                        <h6 class="fw-semibold mb-1">Quito Escapada 3 días</h6>
+                        <p class="text-muted small mb-1">
+                            2 noches de hotel + vuelo ida y vuelta + auto económico + cena en restaurante.
+                        </p>
+                        <div class="d-flex justify-content-between align-items-end">
+                            <div>
+                                <div class="text-muted small">Precio desde</div>
+                                <div class="fw-bold">$399</div>
+                            </div>
+                            <button class="btn btn-primary btn-sm" disabled>
+                                Ver paquete (demo)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="border rounded-3 p-3 h-100">
+                        <h6 class="fw-semibold mb-1">Costa & Relax 5 días</h6>
+                        <p class="text-muted small mb-1">
+                            Hotel frente al mar + vuelo + auto intermedio + menú degustación.
+                        </p>
+                        <div class="d-flex justify-content-between align-items-end">
+                            <div>
+                                <div class="text-muted small">Precio desde</div>
+                                <div class="fw-bold">$699</div>
+                            </div>
+                            <button class="btn btn-primary btn-sm" disabled>
+                                Ver paquete (demo)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-muted small mt-3 mb-0">
+                En la integración final, estos paquetes se construirán a partir de la información
+                devuelta por los servicios de hoteles, vuelos, autos y restaurantes.
+            </p>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,199 @@
+@model BookingMvcDotNet.Models.VuelosSearchViewModel
+@{
+    ViewData["Title"] = "Vuelos";
+    
+    // Colores para aerolíneas
+    string GetAirlineColor(string aerolinea) {
+        var nombre = aerolinea?.ToLower() ?? "";
+        if (nombre.Contains("withfly")) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        if (nombre.Contains("astra")) return "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)";
+        if (nombre.Contains("skayward")) return "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)";
+        if (nombre.Contains("skyandes")) return "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)";
+        if (nombre.Contains("caribbean")) return "linear-gradient(135deg, #fa709a 0%, #fee140 100%)";
+        return "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)";
+    }
+}
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="p-4 rounded-4 text-white mb-3" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <h1 class="display-5 fw-bold mb-2"><i class="bi bi-airplane"></i> Vuelos</h1>
+                <p class="mb-0 opacity-90">5 aerolíneas integradas - Económica, Ejecutiva y Primera Clase</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" asp-action="Index">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Origen</label>
+                        <input type="text" class="form-control" name="origen" value="@Model.Origen" placeholder="Ciudad origen">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Destino</label>
+                        <input type="text" class="form-control" name="destino" value="@Model.Destino" placeholder="Ciudad destino">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Fecha</label>
+                        <input type="date" class="form-control" name="fechaSalida"
+                               value="@Model.FechaSalida?.ToString("yyyy-MM-dd")"
+                               min="@DateTime.Today.ToString("yyyy-MM-dd")">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Pasajeros</label>
+                        <input type="number" class="form-control" name="pasajeros" 
+                               value="@Model.Pasajeros" min="1" max="10">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Cabina</label>
+                        <select class="form-select" name="tipoCabina">
+                            <option value="">Todas</option>
+                            <option value="Economica" selected="@(Model.TipoCabina == "Economica")">Económica</option>
+                            <option value="Ejecutiva" selected="@(Model.TipoCabina == "Ejecutiva")">Ejecutiva</option>
+                            <option value="Primera" selected="@(Model.TipoCabina == "Primera")">Primera Clase</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100" id="btnBuscar">
+                            <span class="spinner-border spinner-border-sm d-none" id="spinnerBuscar"></span>
+                            <span id="textoBuscar">?? Buscar</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+
+    @if (Model.Resultados.Any())
+    {
+        <p class="text-muted mb-3">@Model.Resultados.Count vuelos encontrados</p>
+
+        <div class="row g-3">
+            @foreach (var vuelo in Model.Resultados.OrderBy(v => v.Fecha))
+            {
+                var airlineColor = GetAirlineColor(vuelo.NombreAerolinea);
+                <div class="col-12">
+                    <div class="card shadow-sm flight-card border-0">
+                        <div class="card-body p-4">
+                            <div class="row align-items-center">
+                                <div class="col-md-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                                             style="width: 60px; height: 60px; background: @airlineColor;">
+                                            <span style="font-size: 1.8rem;">??</span>
+                                        </div>
+                                        <div>
+                                            <h6 class="fw-bold mb-0">@vuelo.NombreAerolinea</h6>
+                                            <span class="badge bg-info">@vuelo.TipoCabina</span>
+                                            <br><small class="text-muted">@vuelo.NombreProveedor</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="d-flex align-items-center justify-content-center gap-3">
+                                        <div class="text-center">
+                                            <div class="fw-bold fs-4 text-primary">@vuelo.Origen</div>
+                                            <small class="text-muted">Origen</small>
+                                        </div>
+                        <div class="text-center px-4">
+                                            <div class="border-top border-2 border-primary position-relative" style="width: 80px;">
+                                                <span class="position-absolute top-50 start-50 translate-middle bg-white px-2"><i class="bi bi-airplane"></i></span>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">@vuelo.Fecha.ToString("dd MMM")</small>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="fw-bold fs-4 text-success">@vuelo.Destino</div>
+                                            <small class="text-muted">Destino</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-2 text-center">
+                                    <div class="bg-light rounded-3 p-2">
+                                        <small class="text-muted d-block">Asientos</small>
+                                        <div class="fw-bold fs-5 text-@(vuelo.AsientosDisponibles < 5 ? "danger" : "success")">
+                                            @vuelo.AsientosDisponibles
+                                        </div>
+                                        <small class="text-muted">disponibles</small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3 text-end">
+                                    @if (vuelo.TieneDescuento)
+                                    {
+                                        <small class="text-muted text-decoration-line-through">$@vuelo.PrecioNormal.ToString("N2")</small>
+                                        <span class="badge bg-danger ms-1"><i class="bi bi-fire"></i> -@vuelo.DescuentoPorcentaje.ToString("0")%</span>
+                                    }
+                                    <div class="fw-bold text-warning fs-3">$@vuelo.PrecioActual.ToString("N2")</div>
+                                    <small class="text-muted">por persona</small>
+                                    <div class="mt-2">
+                                        <a asp-action="Detalle"
+                                           asp-route-servicioId="@vuelo.ServicioId"
+                                           asp-route-idVuelo="@vuelo.IdVuelo"
+                                           asp-route-pasajeros="@Model.Pasajeros"
+                                           class="btn btn-warning fw-bold">
+                                            Seleccionar ?
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="text-center py-5">
+            <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=300&h=200&fit=crop" 
+                 class="rounded-4 mb-4 shadow" alt="Avión">
+            <h4 class="fw-bold"><i class="bi bi-search"></i> Busca tu vuelo ideal</h4>
+            <p class="text-muted">Ingresa origen, destino y fecha para ver opciones</p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap mt-3">
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-airplane"></i> Withfly</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-airplane"></i> Astrawings</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-airplane"></i> SkaywardAir</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-airplane"></i> SkyAndes</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-airplane"></i> Caribbean</span>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .flight-card {
+        border-radius: 16px;
+        transition: all 0.3s ease;
+    }
+    .flight-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0,0,0,.12) !important;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        const btnBuscar = document.getElementById('btnBuscar');
+        const spinner = document.getElementById('spinnerBuscar');
+        const texto = document.getElementById('textoBuscar');
+
+        if (form) {
+            form.addEventListener('submit', function() {
+                btnBuscar.disabled = true;
+                spinner.classList.remove('d-none');
+                texto.textContent = 'Buscando...';
+            });
+        }
+    });
+</script>

@@ -1,0 +1,108 @@
+﻿@{
+    ViewData["Title"] = "Módulos";
+}
+
+<h2 class="mb-4">🌍 Explora los módulos</h2>
+
+<div class="row g-4">
+    <!-- Hoteles -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0 module-card">
+            <div class="card-body text-center">
+                <div class="display-3 mb-3">🏨</div>
+                <h5 class="card-title fw-bold">Hoteles</h5>
+                <p class="card-text text-muted small">
+                    Busca habitaciones por ciudad, fechas y huéspedes. 
+                    Integración con 6 hoteles diferentes.
+                </p>
+                <a asp-controller="Hoteles" asp-action="Index"
+                   class="btn btn-success w-100">
+                    🏨 Ver Hoteles
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Autos -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0 module-card">
+            <div class="card-body text-center">
+                <div class="display-3 mb-3">🚗</div>
+                <h5 class="card-title fw-bold">Autos</h5>
+                <p class="card-text text-muted small">
+                    Renta vehículos de múltiples proveedores. 
+                    SUVs, sedanes, camionetas y más.
+                </p>
+                <a asp-controller="Autos" asp-action="Index"
+                   class="btn btn-primary w-100">
+                    🚗 Ver Autos
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vuelos -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0 module-card">
+            <div class="card-body text-center">
+                <div class="display-3 mb-3">✈️</div>
+                <h5 class="card-title fw-bold">Vuelos</h5>
+                <p class="card-text text-muted small">
+                    Encuentra vuelos por origen, destino y fecha. 
+                    5 aerolíneas integradas.
+                </p>
+                <a asp-controller="Vuelos" asp-action="Index"
+                   class="btn btn-warning w-100">
+                    ✈️ Ver Vuelos
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restaurantes -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0 module-card">
+            <div class="card-body text-center">
+                <div class="display-3 mb-3">🍽️</div>
+                <h5 class="card-title fw-bold">Restaurantes</h5>
+                <p class="card-text text-muted small">
+                    Reserva mesas en los mejores restaurantes. 
+                    7 restaurantes disponibles.
+                </p>
+                <a asp-controller="Restaurantes" asp-action="Index"
+                   class="btn btn-danger w-100">
+                    🍽️ Ver Restaurantes
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paquetes turísticos -->
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0 module-card">
+            <div class="card-body text-center">
+                <div class="display-3 mb-3">🎒</div>
+                <h5 class="card-title fw-bold">Paquetes Turísticos</h5>
+                <p class="card-text text-muted small">
+                    Experiencias completas con tours y actividades. 
+                    3 agencias de turismo.
+                </p>
+                <a asp-controller="Paquetes" asp-action="Index"
+                   class="btn btn-info text-white w-100">
+                    🎒 Ver Paquetes
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .module-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15) !important;
+        transition: all 0.3s ease;
+    }
+    .module-card {
+        transition: all 0.3s ease;
+    }
+</style>

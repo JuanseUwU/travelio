@@ -1,0 +1,309 @@
+﻿@using System.Globalization
+@using Microsoft.AspNetCore.Http
+@model BookingMvcDotNet.Models.CartViewModel
+
+@{
+    ViewData["Title"] = "Carrito";
+
+    // Tomamos el porcentaje real del Modelo (que viene del Admin)
+    var taxPercent = Model.IvaPercent;
+
+    // Calculamos el factor decimal para JS (ej: 0.14)
+    decimal taxRateDecimal = taxPercent / 100m;
+
+    bool isLoggedIn = !string.IsNullOrEmpty(Context.Session.GetString("UserEmail"));
+    var itemCount = Model.Items.Sum(i => i.Cantidad);
+}
+
+<section class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">🛒 Tu Carrito</h2>
+        <span class="badge bg-secondary rounded-pill" id="items-count-badge">
+            @(itemCount) items
+        </span>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <ul class="list-group list-group-flush" id="cart-lines">
+                    @if (Model.EstaVacio)
+                    {
+                        <li class="list-group-item text-center py-5">
+                            <div class="text-muted mb-3 display-4">☹️</div>
+                            <h4 class="fw-normal">Tu carrito está vacío</h4>
+                            <a asp-controller="Home" asp-action="Index" class="btn btn-outline-primary mt-3">
+                                Explorar servicios
+                            </a>
+                        </li>
+                    }
+                    else
+                    {
+                        @foreach (var it in Model.Items)
+                        {
+                            <li class="list-group-item p-4 d-flex align-items-center gap-3"
+                                data-role="line"
+                                data-title="@it.Titulo"
+                                data-unit-price="@it.PrecioFinal.ToString(CultureInfo.InvariantCulture)">
+
+                                @if (!string.IsNullOrEmpty(it.ImagenUrl))
+                                {
+                                    <div class="rounded-3 overflow-hidden flex-shrink-0" style="width: 80px; height: 80px;">
+                                        <img src="@it.ImagenUrl" alt="@it.Titulo" 
+                                             style="width: 100%; height: 100%; object-fit: cover;"
+                                             onerror="this.parentElement.innerHTML='<div class=\'bg-light d-flex align-items-center justify-content-center h-100\' style=\'font-size: 2rem;\'>@(it.Tipo == "CAR" ? "🚗" : it.Tipo == "HOTEL" ? "🏨" : it.Tipo == "FLIGHT" ? "✈️" : it.Tipo == "PACKAGE" ? "🎒" : "🍽️")</div>';">
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="rounded-3 bg-light d-flex align-items-center justify-content-center flex-shrink-0"
+                                         style="width: 80px; height: 80px; font-size: 2rem;">
+                                        @if (it.Tipo == "HOTEL")
+                                        {
+                                            <span>🏨</span>
+                                        }
+                                        else if (it.Tipo == "CAR")
+                                        {
+                                            <span>🚗</span>
+                                        }
+                                        else if (it.Tipo == "FLIGHT")
+                                        {
+                                            <span>✈️</span>
+                                        }
+                                        else if (it.Tipo == "PACKAGE")
+                                        {
+                                            <span>🎒</span>
+                                        }
+                                        else
+                                        {
+                                            <span>🍽️</span>
+                                        }
+                                    </div>
+                                }
+
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <h5 class="mb-0 fw-bold">@it.Titulo</h5>
+                                        @if (it.TieneDescuento)
+                                        {
+                                            <span class="badge bg-danger">
+                                                OFERTA -@(it.PorcentajeDescuento)%
+                                            </span>
+                                        }
+                                    </div>
+                                    <p class="text-muted small mb-2">
+                                        @(!string.IsNullOrWhiteSpace(it.Detalle) ? it.Detalle : it.Tipo)
+                                    </p>
+
+                                    <div>
+                                        @if (it.TieneDescuento)
+                                        {
+                                            <span class="text-decoration-line-through text-muted me-2 small">
+                                                @it.PrecioOriginal.ToString("C")
+                                            </span>
+                                            <span class="text-primary fw-bold fs-5">
+                                                @it.PrecioFinal.ToString("C")
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-primary fw-bold fs-5">
+                                                @it.PrecioFinal.ToString("C")
+                                            </span>
+                                        }
+                                        <span class="text-muted small"> @it.UnidadPrecio</span>
+                                    </div>
+                                </div>
+
+                                <div class="text-end" style="min-width: 120px;">
+                                    <div class="fw-bold fs-5 mb-2" data-role="line-total">
+                                        @it.TotalItem.ToString("C")
+                                    </div>
+
+                                    <div class="d-flex align-items-center justify-content-end gap-2">
+                                        @{
+                                            // Los servicios de reserva no permiten cambiar cantidad
+                                            var esReserva = it.Tipo == "CAR" || it.Tipo == "HOTEL" || 
+                                                           it.Tipo == "FLIGHT" || it.Tipo == "RESTAURANT" || 
+                                                           it.Tipo == "PACKAGE";
+                                        }
+                                        @if (!esReserva)
+                                        {
+                                            <div class="input-group input-group-sm" style="width: 100px;">
+                                                <button class="btn btn-outline-secondary" type="button" data-act="dec">-</button>
+                                                <input type="text" class="form-control text-center bg-white"
+                                                       value="@it.Cantidad" readonly data-role="qty">
+                                                <button class="btn btn-outline-secondary" type="button" data-act="inc">+</button>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <input type="hidden" value="1" data-role="qty">
+                                            <span class="badge bg-light text-dark border">1 reserva</span>
+                                        }
+                                        <button class="btn btn-sm btn-light text-danger border" data-act="remove" title="Eliminar">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </li>
+                        }
+                    }
+                </ul>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm sticky-top" style="top: 2rem;">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-4">Resumen de compra</h5>
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Subtotal</span>
+                        <span class="fw-bold" id="subtotal">@Model.Subtotal.ToString("C")</span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-3 pb-3 border-bottom">
+                        <span class="text-muted">IVA (@taxPercent%)</span>
+                        <span class="fw-bold" id="iva">@Model.MontoIva.ToString("C")</span>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <span class="h5 fw-bold mb-0">Total</span>
+                        <span class="h3 fw-bold text-primary mb-0" id="total">@Model.Total.ToString("C")</span>
+                    </div>
+
+                    <button id="pay-btn" class="btn btn-primary w-100 btn-lg fw-bold"
+                            @(Model.EstaVacio ? "disabled" : "")>
+                        Continuar al Pago
+                    </button>
+
+                    <div class="mt-3 text-center small text-muted">
+                        <i class="bi bi-shield-lock"></i> Compra 100% segura
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+
+            // Pasamos el IVA dinámico del modelo al JS
+            const TAX_RATE = parseFloat("@taxRateDecimal.ToString(CultureInfo.InvariantCulture)");
+            const IS_LOGGED = @(isLoggedIn.ToString().ToLower());
+
+            const list = document.getElementById("cart-lines");
+            const badge = document.getElementById("items-count-badge");
+
+            const subtotalEl = document.getElementById("subtotal");
+            const ivaEl = document.getElementById("iva");
+            const totalEl = document.getElementById("total");
+            const payBtn = document.getElementById("pay-btn");
+
+            const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+
+            // FUNCIÓN RECALCULAR CLIENTE (Visual)
+            function recompute() {
+                let subtotal = 0;
+                let count = 0;
+
+                if (list) {
+                    const lines = list.querySelectorAll('[data-role="line"]');
+                    lines.forEach(li => {
+                        const unitPrice = parseFloat(li.getAttribute("data-unit-price") || "0");
+                        const qtyInput = li.querySelector('[data-role="qty"]');
+                        const qty = parseInt(qtyInput.value || "0");
+
+                        const lineTotal = unitPrice * qty;
+                        subtotal += lineTotal;
+                        count += qty;
+
+                        const lineTotalEl = li.querySelector('[data-role="line-total"]');
+                        if (lineTotalEl) lineTotalEl.textContent = fmt.format(lineTotal);
+                    });
+                }
+
+                const iva = subtotal * TAX_RATE;
+                const total = subtotal + iva;
+
+                if (subtotalEl) subtotalEl.textContent = fmt.format(subtotal);
+                if (ivaEl) ivaEl.textContent = fmt.format(iva);
+                if (totalEl) totalEl.textContent = fmt.format(total);
+
+                if (badge) badge.textContent = count + " items";
+                if (payBtn) payBtn.disabled = (count === 0);
+            }
+
+            // --- AJAX OPERATIONS (Igual que antes, solo estructura limpia) ---
+            function syncUpdate(title, qty) {
+                let fd = new FormData(); fd.append('titulo', title); fd.append('cantidad', qty);
+                fetch('/Home/ActualizarCantidadApi', { method: 'POST', body: fd });
+            }
+
+            function syncDelete(title) {
+                let fd = new FormData(); fd.append('titulo', title);
+                fetch('/Home/EliminarDelCarritoApi', { method: 'POST', body: fd });
+            }
+
+            if (list) {
+                list.addEventListener("click", function (ev) {
+                    const btn = ev.target.closest("button");
+                    if (!btn) return;
+
+                    const action = btn.getAttribute("data-act");
+                    const li = btn.closest('[data-role="line"]');
+                    const qtyInput = li.querySelector('[data-role="qty"]');
+                    const title = li.getAttribute("data-title");
+                    let qty = parseInt(qtyInput.value || "0");
+
+                    if (action === "inc") {
+                        qty++; qtyInput.value = qty;
+                        recompute(); syncUpdate(title, qty);
+                    }
+                    else if (action === "dec") {
+                        if (qty > 1) {
+                            qty--; qtyInput.value = qty;
+                            recompute(); syncUpdate(title, qty);
+                        }
+                    }
+                    else if (action === "remove") {
+                         Swal.fire({
+                            title: '¿Eliminar?',
+                            text: "Se quitará del carrito.",
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#d33',
+                            confirmButtonText: 'Eliminar'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                li.remove();
+                                recompute();
+                                syncDelete(title);
+                                if (!list.querySelector('[data-role="line"]')) location.reload();
+                            }
+                        });
+                    }
+                });
+            }
+
+            if (payBtn) {
+                payBtn.addEventListener("click", function () {
+                    if (!IS_LOGGED) {
+                        Swal.fire({
+                            icon: 'info', title: 'Inicia sesión',
+                            text: 'Necesitas una cuenta para pagar.',
+                            confirmButtonText: 'Ir a Login'
+                        }).then(r => { if(r.isConfirmed) window.location.href = '@Url.Action("Login")'; });
+                    } else {
+                        // Redirigir a la página de checkout
+                        window.location.href = '@Url.Action("Checkout")';
+                    }
+                });
+            }
+        });
+    </script>
+}

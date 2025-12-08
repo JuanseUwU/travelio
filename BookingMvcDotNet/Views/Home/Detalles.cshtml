@@ -1,0 +1,166 @@
+﻿@model BookingMvcDotNet.Models.ServiceDetailViewModel
+
+@{
+    ViewData["Title"] = Model.Titulo;
+
+    double rating = Model.Rating;
+    string valoracionTexto = rating >= 4.8 ? "Excepcional"
+                          : rating >= 4.5 ? "Excelente"
+                          : rating >= 4.0 ? "Muy bueno"
+                          : "Bueno";
+
+    // Por ahora asumimos que el precio ya viene final desde la API/SOAP
+    bool hasDiscount = false;
+    int discountPct = 0;
+    decimal finalPrice = Model.Precio;
+}
+
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Inicio</a></li>
+            <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Results">Resultados</a></li>
+            <li class="breadcrumb-item active" aria-current="page">@Model.Titulo</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="bg-light rounded-3 d-flex align-items-center justify-content-center mb-4 shadow-sm position-relative"
+                 style="height: 400px; overflow: hidden;">
+                <div class="display-1 text-secondary">
+                    @if (Model.Tipo == "HOTEL")
+                    {
+                        <span>🏨</span>
+                    }
+                    else if (Model.Tipo == "CAR")
+                    {
+                        <span>🚗</span>
+                    }
+                    else if (Model.Tipo == "FLIGHT")
+                    {
+                        <span>✈️</span>
+                    }
+                    else
+                    {
+                        <span>🍽️</span>
+                    }
+                </div>
+                <span class="position-absolute top-0 start-0 m-3 badge bg-primary fs-6">@Model.Tipo</span>
+
+                @if (hasDiscount)
+                {
+                    <span class="position-absolute top-0 end-0 m-3 badge bg-danger fs-5 shadow">
+                        OFERTA -@discountPct%
+                    </span>
+                }
+            </div>
+
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h1 class="fw-bold mb-1">@Model.Titulo</h1>
+                    <p class="text-muted h5">
+                        <i class="bi bi-geo-alt-fill text-danger"></i> @Model.Ciudad
+                    </p>
+                </div>
+
+                <div class="text-end">
+                    <div class="text-warning fs-5 mb-1">
+                        @Html.Raw(GenerarEstrellasHtml(rating))
+                    </div>
+                    <div class="fw-bold text-dark">
+                        @rating.ToString("0.0") / 5.0
+                        <span class="text-muted fw-normal">(@valoracionTexto)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                @if (Model.Tags != null)
+                {
+                    @foreach (var tag in Model.Tags)
+                    {
+                        <span class="badge bg-info text-dark me-2 p-2">
+                            <i class="bi bi-check2"></i> @tag
+                        </span>
+                    }
+                }
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <h4 class="card-title">Descripción</h4>
+                    <p class="card-text lead fs-6">@Model.Descripcion</p>
+                    <p>
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                        Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow border-0 sticky-top" style="top: 2rem;">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-muted">Precio desde</span>
+                        <div class="text-end">
+                            @if (hasDiscount)
+                            {
+                                <div class="text-decoration-line-through text-muted small">
+                                    $@Model.Precio.ToString("N2")
+                                </div>
+                                <span class="h3 fw-bold text-danger mb-0">
+                                    $@finalPrice.ToString("N2")
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="h3 fw-bold text-primary mb-0">
+                                    $@Model.Precio.ToString("N2")
+                                </span>
+                            }
+                            <small class="text-muted d-block"> / @Model.UnidadPrecio</small>
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Fechas simuladas</label>
+                        <input type="text" class="form-control bg-light"
+                               value="Fechas seleccionadas en Home"
+                               readonly disabled />
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary btn-lg shadow-sm"
+                                onclick="agregarItem('@Model.Tipo', '@Model.Titulo')">
+                            Agregar al Carrito
+                        </button>
+                    </div>
+
+                    <div class="mt-3 text-center">
+                        <small class="text-muted">
+                            <i class="bi bi-shield-check"></i> Reserva segura y garantizada
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    public string GenerarEstrellasHtml(double rating)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 1; i <= 5; i++)
+        {
+            if (rating >= i) sb.Append("<i class='bi bi-star-fill'></i> ");
+            else if (rating > i - 1) sb.Append("<i class='bi bi-star-half'></i> ");
+            else sb.Append("<i class='bi bi-star'></i> ");
+        }
+        return sb.ToString();
+    }
+}

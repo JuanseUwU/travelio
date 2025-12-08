@@ -1,0 +1,278 @@
+﻿@using Microsoft.AspNetCore.Http
+@model BookingMvcDotNet.Models.ResultsViewModel
+
+@{
+    ViewData["Title"] = "Resultados";
+
+    var queryQ = Context.Request.Query["q"].ToString();
+    var queryTipo = Context.Request.Query["tipo"].ToString();
+    var minPrice = Context.Request.Query["minPrice"].ToString();
+    var maxPrice = Context.Request.Query["maxPrice"].ToString();
+    var rawRating = Context.Request.Query["minRating"].ToString();
+    var minRating = string.IsNullOrEmpty(rawRating) ? "0" : rawRating;
+    var sortBy = Context.Request.Query["sortBy"].ToString();
+}
+
+<h2 class="mb-3">Resultados</h2>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-warning">@Model.ErrorMessage</div>
+}
+
+<div class="row g-4">
+    <aside class="col-lg-3">
+        <form id="filtersForm" asp-action="Results" method="get">
+            <input type="hidden" name="checkIn" value="@Context.Request.Query["checkIn"]" />
+            <input type="hidden" name="checkOut" value="@Context.Request.Query["checkOut"]" />
+
+            <div class="card shadow-sm border-0 sticky-top" style="top: 20px; z-index: 1;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">Filtros</h5>
+                        <a href="@Url.Action("Results", "Home")"
+                           class="btn btn-link btn-sm p-0 text-decoration-none">Limpiar</a>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Tipo</label>
+                        @{
+                            bool all = string.IsNullOrEmpty(queryTipo);
+                        }
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo" id="fTodos" value=""
+                                   @(all ? "checked" : "") onchange="this.form.submit()" />
+                            <label class="form-check-label" for="fTodos">Todos</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo" id="fHoteles" value="HOTEL"
+                                   @(queryTipo == "HOTEL" ? "checked" : "") onchange="this.form.submit()" />
+                            <label class="form-check-label" for="fHoteles">Hoteles</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo" id="fAutos" value="CAR"
+                                   @(queryTipo == "CAR" ? "checked" : "") onchange="this.form.submit()" />
+                            <label class="form-check-label" for="fAutos">Autos</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo" id="fVuelos" value="FLIGHT"
+                                   @(queryTipo == "FLIGHT" ? "checked" : "") onchange="this.form.submit()" />
+                            <label class="form-check-label" for="fVuelos">Vuelos</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo" id="fRestaurantes" value="RESTAURANT"
+                                   @(queryTipo == "RESTAURANT" ? "checked" : "") onchange="this.form.submit()" />
+                            <label class="form-check-label" for="fRestaurantes">Restaurantes</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Ciudad</label>
+                        <input type="text" class="form-control form-control-sm"
+                               name="q" value="@queryQ"
+                               placeholder="Ej: Quito, Madrid..."
+                               onchange="this.form.submit()" />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Precio (USD)</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">$</span>
+
+                            <input type="number" class="form-control" name="minPrice" value="@minPrice" placeholder="Mín"
+                                   min="0"
+                                   onkeypress="return (event.charCode >= 48 && event.charCode <= 57) || event.charCode === 46"
+                                   oninput="if(this.value < 0) this.value = 0;" />
+
+                            <span class="input-group-text">-</span>
+
+                            <input type="number" class="form-control" name="maxPrice" value="@maxPrice" placeholder="Máx"
+                                   min="0"
+                                   onkeypress="return (event.charCode >= 48 && event.charCode <= 57) || event.charCode === 46"
+                                   oninput="if(this.value < 0) this.value = 0;" />
+
+                            <button class="btn btn-outline-primary" type="submit">Ok</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between">
+                            <label class="form-label small fw-bold text-uppercase text-muted">Rating mínimo</label>
+                            <span class="badge bg-light text-primary border" id="ratingValueDisplay">@minRating +</span>
+                        </div>
+                        <input type="range" class="form-range" min="0" max="5" step="0.5"
+                               name="minRating" value="@minRating"
+                               oninput="document.getElementById('ratingValueDisplay').innerText = this.value + ' +'"
+                               onchange="this.form.submit()" />
+                        <div class="d-flex justify-content-between small text-muted font-monospace">
+                            <span>0</span><span>5</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Ordenar por</label>
+                        <select class="form-select form-select-sm" name="sortBy" onchange="this.form.submit()">
+                            @* Relevancia *@
+                            @if (string.IsNullOrEmpty(sortBy) || sortBy == "relevance")
+                            {
+                                <option value="relevance" selected>Relevancia</option>
+                            }
+                            else
+                            {
+                                <option value="relevance">Relevancia</option>
+                            }
+
+                            @* Precio: menor a mayor *@
+                            @if (sortBy == "price_asc")
+                            {
+                                <option value="price_asc" selected>Precio: menor a mayor</option>
+                            }
+                            else
+                            {
+                                <option value="price_asc">Precio: menor a mayor</option>
+                            }
+
+                            @* Precio: mayor a menor *@
+                            @if (sortBy == "price_desc")
+                            {
+                                <option value="price_desc" selected>Precio: mayor a menor</option>
+                            }
+                            else
+                            {
+                                <option value="price_desc">Precio: mayor a menor</option>
+                            }
+
+                            @* Rating: alto primero *@
+                            @if (sortBy == "rating_desc")
+                            {
+                                <option value="rating_desc" selected>Rating: alto primero</option>
+                            }
+                            else
+                            {
+                                <option value="rating_desc">Rating: alto primero</option>
+                            }
+                        </select>
+                    </div>
+
+                </div>
+            </div>
+        </form>
+    </aside>
+
+    <section class="col-lg-9">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="mb-0">Resultados</h5>
+                <small class="text-muted">@(Model.Items?.Count ?? 0) resultados encontrados</small>
+                @if (!string.IsNullOrEmpty(queryQ))
+                {
+                    <span class="badge bg-primary ms-2">Zona: "@queryQ"</span>
+                }
+            </div>
+        </div>
+
+        <div class="row g-3">
+            @if (Model.Items != null && Model.Items.Any())
+            {
+                @foreach (var item in Model.Items)
+                {
+                    bool hasDiscount = false;
+                    decimal finalPrice = item.Precio;
+                    int discountPct = 0;
+
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card h-100 shadow-sm border-0 product-card">
+                            <div class="bg-light d-flex align-items-center justify-content-center position-relative" style="height: 160px;">
+                                <span class="h1 text-muted">
+                                    @(item.Tipo == "HOTEL" ? "🏨"
+                                                                : item.Tipo == "CAR" ? "🚗"
+                                                                : item.Tipo == "FLIGHT" ? "✈️"
+                                                                : "🍽️")
+                                </span>
+                                <span class="badge bg-white text-dark position-absolute top-0 end-0 m-2 shadow-sm">
+                                    @item.Tipo
+                                </span>
+
+                                @if (hasDiscount)
+                                {
+                                    <span class="badge bg-danger position-absolute top-0 start-0 m-2 shadow-sm">
+                                        OFERTA -@discountPct%
+                                    </span>
+                                }
+                            </div>
+
+                            <div class="card-body">
+                                <h5 class="card-title mb-1 text-truncate">@item.Titulo</h5>
+                                <div class="text-muted small mb-2">@item.Ciudad</div>
+
+                                <div class="mb-2 text-warning small">
+                                    @Html.Raw(GenerarEstrellasHtml(item.Rating))
+                                    <span class="text-muted small ms-1">(@item.Rating)</span>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-end mt-3">
+                                    <div>
+                                        @if (hasDiscount)
+                                        {
+                                            <div class="fw-bold text-decoration-line-through text-muted small">
+                                                $@item.Precio.ToString("N2")
+                                            </div>
+                                            <div class="fw-bold text-danger fs-5">
+                                                $@finalPrice.ToString("N2")
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="fw-bold fs-5">
+                                                $@item.Precio.ToString("N2")
+                                            </div>
+                                        }
+                                        <div class="text-muted small">@item.UnidadPrecio</div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <a class="btn btn-light border btn-icon-circle"
+                                           asp-controller="Home"
+                                           asp-action="Detalles"
+                                           asp-route-tipo="@item.Tipo"
+                                           asp-route-titulo="@item.Titulo"
+                                           title="Ver detalles">
+                                            <i class="bi bi-arrow-right"></i>
+                                        </a>
+                                        <button class="btn btn-primary btn-sm rounded-pill px-3"
+                                                onclick="agregarItem('@item.Tipo', '@item.Titulo')">
+                                            Agregar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="col-12">
+                    <div class="alert alert-light text-center w-100 py-5">
+                        <div class="fs-1 mb-3">🔍</div>
+                        <h4>No se encontraron resultados</h4>
+                        <a href="@Url.Action("Results", "Home")" class="btn btn-outline-primary mt-2">Ver todo</a>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+</div>
+
+@functions {
+    public string GenerarEstrellasHtml(double rating)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 1; i <= 5; i++)
+        {
+            if (rating >= i) sb.Append("<i class='bi bi-star-fill'></i> ");
+            else if (rating > i - 1) sb.Append("<i class='bi bi-star-half'></i> ");
+            else sb.Append("<i class='bi bi-star'></i> ");
+        }
+        return sb.ToString();
+    }
+}

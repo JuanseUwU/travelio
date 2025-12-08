@@ -1,0 +1,237 @@
+@model BookingMvcDotNet.Models.AutoDetalleViewModel
+@{
+    ViewData["Title"] = Model.Tipo;
+    
+    // Imagen de respaldo según tipo
+    string GetFallbackImage(string tipo) {
+        var t = tipo?.ToLower() ?? "";
+        if (t.Contains("suv") || t.Contains("sportage")) return "https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?w=800&h=500&fit=crop";
+        if (t.Contains("sedan") || t.Contains("corolla")) return "https://images.unsplash.com/photo-1550355291-bbee04a92027?w=800&h=500&fit=crop";
+        if (t.Contains("pickup") || t.Contains("hilux")) return "https://images.unsplash.com/photo-1559416523-140ddc3d238c?w=800&h=500&fit=crop";
+        if (t.Contains("yaris") || t.Contains("economico")) return "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=800&h=500&fit=crop";
+        return "https://images.unsplash.com/photo-1502877338535-766e1452684a?w=800&h=500&fit=crop";
+    }
+    var fallbackImg = GetFallbackImage(Model.Tipo);
+    var tieneImagen = !string.IsNullOrEmpty(Model.UriImagen) && 
+                      (Model.UriImagen.StartsWith("http://") || Model.UriImagen.StartsWith("https://"));
+    var imagenFinal = tieneImagen ? Model.UriImagen : fallbackImg;
+}
+
+<div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">?? Inicio</a></li>
+            <li class="breadcrumb-item"><a asp-controller="Autos" asp-action="Index">?? Autos</a></li>
+            <li class="breadcrumb-item active">@Model.Tipo</li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <!-- Columna izquierda: Imagen y detalles -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4 border-0 overflow-hidden" style="border-radius: 20px;">
+                <img src="@imagenFinal" class="card-img-top" alt="@Model.Tipo" 
+                     style="max-height: 450px; object-fit: cover;"
+                     onerror="this.src='@fallbackImg';">
+            </div>
+
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <span class="badge bg-primary fs-6 p-2">@Model.NombreProveedor</span>
+                <span class="badge bg-light text-dark border fs-6 p-2">?? @Model.CapacidadPasajeros pasajeros</span>
+            </div>
+
+            <h1 class="fw-bold display-6">@Model.Tipo</h1>
+            <p class="text-muted fs-5">?? @Model.Ciudad, @Model.Pais</p>
+
+            <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+                <div class="card-body p-4">
+                    <h5 class="card-title fw-bold mb-3">? Características del vehículo</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
+                                <span class="fs-3">??</span>
+                                <div>
+                                    <small class="text-muted d-block">Capacidad</small>
+                                    <strong>@Model.CapacidadPasajeros pasajeros</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
+                                <span class="fs-3">??</span>
+                                <div>
+                                    <small class="text-muted d-block">Proveedor</small>
+                                    <strong>@Model.NombreProveedor</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
+                                <span class="fs-3">??</span>
+                                <div>
+                                    <small class="text-muted d-block">Ubicación</small>
+                                    <strong>@Model.Ciudad, @Model.Pais</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
+                                <span class="fs-3">??</span>
+                                <div>
+                                    <small class="text-muted d-block">Tipo</small>
+                                    <strong>@Model.Tipo</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna derecha: Reserva -->
+        <div class="col-lg-4">
+            <div class="card shadow border-0 sticky-top" style="top: 20px; border-radius: 20px;">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-4">?? Reservar Vehículo</h5>
+                    
+                    <!-- Precio -->
+                    <div class="mb-4 p-3 rounded-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        @if (Model.TieneDescuento)
+                        {
+                            <span class="badge bg-danger mb-2">?? -@Model.DescuentoPorcentaje.ToString("0")% DESCUENTO</span>
+                            <div class="text-white-50 text-decoration-line-through">$@Model.PrecioNormalPorDia.ToString("N2")/día</div>
+                        }
+                        <div class="display-5 fw-bold text-white">
+                            $@Model.PrecioActualPorDia.ToString("N2")<small class="fs-6 opacity-75">/día</small>
+                        </div>
+                    </div>
+
+                    <!-- Formulario de fechas -->
+                    <form id="formReserva">
+                        <input type="hidden" name="servicioId" value="@Model.ServicioId">
+                        <input type="hidden" name="idAuto" value="@Model.IdAuto">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">?? Fecha Recogida</label>
+                            <input type="date" class="form-control form-control-lg" name="fechaInicio" id="fechaInicio"
+                                   value="@Model.FechaInicio.ToString("yyyy-MM-dd")"
+                                   min="@DateTime.Today.ToString("yyyy-MM-dd")">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">?? Fecha Entrega</label>
+                            <input type="date" class="form-control form-control-lg" name="fechaFin" id="fechaFin"
+                                   value="@Model.FechaFin.ToString("yyyy-MM-dd")">
+                        </div>
+
+                        <!-- Estado de disponibilidad -->
+                        @if (Model.Disponible)
+                        {
+                            <div class="alert alert-success mb-3 rounded-3" id="disponibilidadAlert">
+                                ? <strong>Disponible</strong> para las fechas seleccionadas
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning mb-3 rounded-3" id="disponibilidadAlert">
+                                ?? <strong>No disponible</strong> - Selecciona otras fechas
+                            </div>
+                        }
+
+                        <!-- Total estimado -->
+                        <div class="border-top pt-3 mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted"><span id="diasRenta">@Model.DiasRenta</span> día(s) x $@Model.PrecioActualPorDia.ToString("N2")</span>
+                                <strong id="totalEstimado">$@Model.TotalEstimado.ToString("N2")</strong>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-primary w-100 btn-lg fw-bold" id="btnAgregar"
+                                style="border-radius: 12px;"
+                                @(Model.Disponible ? "" : "disabled")>
+                            ?? Agregar al carrito
+                        </button>
+                    </form>
+                    
+                    <div class="text-center mt-3">
+                        <small class="text-muted">?? Reserva segura • Cancelación flexible</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const servicioId = @Model.ServicioId;
+    const idAuto = '@Model.IdAuto';
+    const precioPorDia = @Model.PrecioActualPorDia;
+
+    document.getElementById('fechaInicio').addEventListener('change', verificarDisponibilidad);
+    document.getElementById('fechaFin').addEventListener('change', verificarDisponibilidad);
+
+    async function verificarDisponibilidad() {
+        const fechaInicio = document.getElementById('fechaInicio').value;
+        const fechaFin = document.getElementById('fechaFin').value;
+
+        if (!fechaInicio || !fechaFin) return;
+
+        const dias = Math.max(1, Math.ceil((new Date(fechaFin) - new Date(fechaInicio)) / (1000 * 60 * 60 * 24)));
+        document.getElementById('diasRenta').textContent = dias;
+        document.getElementById('totalEstimado').textContent = '$' + (dias * precioPorDia).toFixed(2);
+
+        try {
+            const response = await fetch('@Url.Action("VerificarDisponibilidad", "Autos")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `servicioId=${servicioId}&idAuto=${idAuto}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
+            });
+
+            const result = await response.json();
+            const alertDiv = document.getElementById('disponibilidadAlert');
+            const btn = document.getElementById('btnAgregar');
+
+            if (result.disponible) {
+                alertDiv.className = 'alert alert-success mb-3';
+                alertDiv.innerHTML = '<i class="bi bi-check-circle"></i> <strong>Disponible</strong>';
+                btn.disabled = false;
+            } else {
+                alertDiv.className = 'alert alert-warning mb-3';
+                alertDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> <strong>No disponible</strong>';
+                btn.disabled = true;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    document.getElementById('btnAgregar').addEventListener('click', async () => {
+        const fechaInicio = document.getElementById('fechaInicio').value;
+        const fechaFin = document.getElementById('fechaFin').value;
+
+        if (!fechaInicio || !fechaFin) {
+            alert('Selecciona las fechas');
+            return;
+        }
+
+        try {
+            const response = await fetch('@Url.Action("AgregarAlCarrito", "Autos")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `servicioId=${servicioId}&idAuto=${idAuto}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
+            });
+
+            const result = await response.json();
+            alert(result.message);
+
+            if (result.success) {
+                window.location.href = '@Url.Action("Carrito", "Home")';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error al agregar');
+        }
+    });
+</script>
+}

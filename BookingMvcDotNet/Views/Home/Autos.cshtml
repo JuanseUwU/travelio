@@ -1,0 +1,27 @@
+﻿@{
+    ViewData["Title"] = "Autos";
+}
+
+<section class="py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">🚗 Módulo de Autos</h2>
+            <p class="text-muted mb-0">
+                Renta de vehículos conectado con 6 proveedores SOAP/REST.
+            </p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body text-center py-5">
+            <div class="display-1 mb-3">🚗</div>
+            <h4>Módulo de Renta de Autos</h4>
+            <p class="text-muted">
+                Busca vehículos en: Cuenca Wheels, LojitaGO, EasyCar, Auto Car Rent, RentaAutosGYE, UrbanDrive NY
+            </p>
+            <a asp-controller="Autos" asp-action="Index" class="btn btn-primary btn-lg">
+                <i class="bi bi-search"></i> Ir a buscar autos
+            </a>
+        </div>
+    </div>
+</section>

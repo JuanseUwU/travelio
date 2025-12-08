@@ -1,0 +1,211 @@
+@model BookingMvcDotNet.Models.PaquetesSearchViewModel
+@{
+    ViewData["Title"] = "Paquetes Turísticos";
+    
+    // Imágenes según tipo de actividad
+    string GetPackageImage(string tipo, string ciudad) {
+        var t = (tipo?.ToLower() ?? "") + " " + (ciudad?.ToLower() ?? "");
+        if (t.Contains("aventura") || t.Contains("extreme") || t.Contains("rafting"))
+            return "https://images.unsplash.com/photo-1530866495561-507c9faab2ed?w=400&h=250&fit=crop";
+        if (t.Contains("cultural") || t.Contains("historico") || t.Contains("museo"))
+            return "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=250&fit=crop";
+        if (t.Contains("gastronom") || t.Contains("culinario") || t.Contains("food"))
+            return "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=250&fit=crop";
+        if (t.Contains("relax") || t.Contains("spa") || t.Contains("bienestar"))
+            return "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&h=250&fit=crop";
+        if (t.Contains("familiar") || t.Contains("family") || t.Contains("niños"))
+            return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=250&fit=crop";
+        if (t.Contains("playa") || t.Contains("beach") || t.Contains("costa"))
+            return "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=250&fit=crop";
+        if (t.Contains("montaña") || t.Contains("mountain") || t.Contains("sierra"))
+            return "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&h=250&fit=crop";
+        if (t.Contains("cuenca") || t.Contains("ecuador"))
+            return "https://images.unsplash.com/photo-1526392060635-9d6019884377?w=400&h=250&fit=crop";
+        return "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400&h=250&fit=crop";
+    }
+    
+    string GetActivityEmoji(string tipo) {
+        var t = tipo?.ToLower() ?? "";
+        if (t.Contains("aventura")) return "???";
+        if (t.Contains("cultural")) return "???";
+        if (t.Contains("gastronom")) return "???";
+        if (t.Contains("relax")) return "??";
+        if (t.Contains("familiar")) return "???????????";
+        if (t.Contains("playa")) return "???";
+        return "??";
+    }
+}
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="p-4 rounded-4 text-dark mb-3" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+                <h1 class="display-5 fw-bold mb-2"><i class="bi bi-backpack2"></i> Paquetes Turísticos</h1>
+                <p class="mb-0 opacity-75">3 agencias integradas - Aventura, Cultural, Gastronómico y más</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" asp-action="Index">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Ciudad</label>
+                        <input type="text" class="form-control" name="ciudad" value="@Model.Ciudad" placeholder="Ej: Cuenca">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Fecha inicio</label>
+                        <input type="date" class="form-control" name="fechaInicio"
+                               value="@Model.FechaInicio?.ToString("yyyy-MM-dd")"
+                               min="@DateTime.Today.ToString("yyyy-MM-dd")">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Personas</label>
+                        <input type="number" class="form-control" name="personas" 
+                               value="@Model.Personas" min="1" max="20">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tipo</label>
+                        <select class="form-select" name="tipoActividad">
+                            <option value="">Todos</option>
+                            <option value="Aventura" selected="@(Model.TipoActividad == "Aventura")">??? Aventura</option>
+                            <option value="Cultural" selected="@(Model.TipoActividad == "Cultural")">??? Cultural</option>
+                            <option value="Gastronomico" selected="@(Model.TipoActividad == "Gastronomico")">??? Gastronómico</option>
+                            <option value="Relax" selected="@(Model.TipoActividad == "Relax")">?? Relax</option>
+                            <option value="Familiar" selected="@(Model.TipoActividad == "Familiar")">??????????? Familiar</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Precio máx.</label>
+                        <input type="number" class="form-control" name="precioMax" 
+                               value="@Model.PrecioMax" min="0" step="50" placeholder="Sin límite">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100" id="btnBuscar">
+                            <span class="spinner-border spinner-border-sm d-none" id="spinnerBuscar"></span>
+                            <span id="textoBuscar">?? Buscar</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+
+    @if (Model.Resultados.Any())
+    {
+        <p class="text-muted mb-3">@Model.Resultados.Count paquetes encontrados</p>
+
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            @foreach (var paquete in Model.Resultados)
+            {
+                var packageImg = GetPackageImage(paquete.TipoActividad, paquete.Ciudad);
+                var emoji = GetActivityEmoji(paquete.TipoActividad);
+                var imagenFinal = !string.IsNullOrEmpty(paquete.ImagenUrl) ? paquete.ImagenUrl : packageImg;
+                
+                <div class="col">
+                    <div class="card h-100 shadow-sm paquete-card">
+                        <div class="position-relative">
+                            <img src="@imagenFinal" class="card-img-top" alt="@paquete.Nombre"
+                                 style="height: 200px; object-fit: cover;"
+                                 onerror="this.src='@packageImg';">
+
+                            @if (paquete.TieneDescuento)
+                            {
+                                <span class="position-absolute top-0 end-0 m-2 badge bg-danger fs-6">
+                                    <i class="bi bi-fire"></i> -@paquete.DescuentoPorcentaje.ToString("0")%
+                                </span>
+                            }
+                            <span class="position-absolute bottom-0 start-0 m-2 badge bg-success fs-6">
+                                @paquete.NombreProveedor
+                            </span>
+                        </div>
+
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold mb-1">@paquete.Nombre</h5>
+                            <p class="text-muted small mb-2">
+                                <i class="bi bi-geo-alt"></i> @paquete.Ciudad, @paquete.Pais
+                            </p>
+
+                            <div class="d-flex flex-wrap gap-1 mb-3">
+                                <span class="badge bg-info text-white"><i class="bi bi-backpack2"></i> @paquete.TipoActividad</span>
+                                <span class="badge bg-light text-dark border"><i class="bi bi-calendar3"></i> @paquete.Duracion días</span>
+                                <span class="badge bg-light text-dark border"><i class="bi bi-people"></i> @paquete.Capacidad max</span>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-end">
+                                <div>
+                                    @if (paquete.TieneDescuento)
+                                    {
+                                        <small class="text-muted text-decoration-line-through">$@paquete.PrecioNormal.ToString("N2")</small>
+                                    }
+                                    <div class="fw-bold text-success fs-4">
+                                        $@paquete.PrecioActual.ToString("N2")
+                                    </div>
+                                    <small class="text-muted">por persona</small>
+                                </div>
+
+                                <a asp-action="Detalle"
+                                   asp-route-servicioId="@paquete.ServicioId"
+                                   asp-route-idPaquete="@paquete.IdPaquete"
+                                   asp-route-fechaInicio="@Model.FechaInicio?.ToString("yyyy-MM-dd")"
+                                   asp-route-personas="@Model.Personas"
+                                   class="btn btn-success">
+                                    Ver más ?
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="text-center py-5">
+            <img src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=300&h=200&fit=crop" 
+                 class="rounded-4 mb-4 shadow" alt="Paquete turístico">
+            <h4 class="fw-bold"><i class="bi bi-search"></i> Busca paquetes turísticos</h4>
+            <p class="text-muted">Encuentra experiencias únicas en tu destino favorito</p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap mt-3">
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-globe"></i> World Agency</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-geo-alt"></i> Cuenca Travel</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-backpack2"></i> Paquetes Web</span>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .paquete-card {
+        border-radius: 16px;
+        border: none;
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+    .paquete-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 35px rgba(0,0,0,.15) !important;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        const btnBuscar = document.getElementById('btnBuscar');
+        const spinner = document.getElementById('spinnerBuscar');
+        const texto = document.getElementById('textoBuscar');
+        if (form) {
+            form.addEventListener('submit', function() {
+                btnBuscar.disabled = true;
+                spinner.classList.remove('d-none');
+                texto.textContent = 'Buscando...';
+            });
+        }
+    });
+</script>

@@ -1,0 +1,137 @@
+﻿@model BookingMvcDotNet.Models.UserViewModel
+@{
+    ViewData["Title"] = "Mi Perfil";
+}
+
+<div class="container mt-4 pb-5">
+    <h2 class="mb-4">👤 Mi Perfil</h2>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <h4 class="mb-3">
+                🛍️ Mis compras 
+                <span class="badge bg-light text-dark border ms-2">@Model.Orders.Count compras</span>
+            </h4>
+
+            @if (Model.Orders.Any())
+            {
+                @foreach (var order in Model.Orders)
+                {
+                    <div class="card mb-4 shadow-sm border-0">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                            <div>
+                                <div class="fw-bold">
+                                    🧾 Compra #@order.OrderId
+                                </div>
+                                <div class="small text-muted">@order.Date.ToString("dd MMM yyyy · HH:mm")</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="badge bg-success px-3 py-2">✓ Pagado</span>
+                                <span class="fw-bold fs-5 text-success">$@order.Total.ToString("N2")</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Items de la compra -->
+                            <ul class="list-group list-group-flush mb-3">
+                                @foreach (var item in order.Items)
+                                {
+                                    <li class="list-group-item px-0">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="d-flex align-items-center gap-3">
+                                                <div class="bg-light rounded p-2 text-center" style="width:45px; height:45px; display:flex; align-items:center; justify-content:center;">
+                                                    <span style="font-size: 1.5rem;">
+                                                        @(item.Tipo == "HOTEL" ? "🏨" : item.Tipo == "FLIGHT" ? "✈️" : item.Tipo == "CAR" ? "🚗" : "🎫")
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <div class="fw-semibold">@item.Titulo</div>
+                                                    @if (!string.IsNullOrEmpty(item.CodigoReserva))
+                                                    {
+                                                        <small class="text-muted">Reserva: #@item.CodigoReserva</small>
+                                                    }
+                                                </div>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="fw-bold">$@item.Total.ToString("N2")</div>
+                                                @if (!string.IsNullOrEmpty(item.FacturaProveedorUrl))
+                                                {
+                                                    <a href="@item.FacturaProveedorUrl" target="_blank" 
+                                                       class="btn btn-sm btn-outline-secondary mt-1">
+                                                        📄 Factura
+                                                    </a>
+                                                }
+                                            </div>
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                            
+                            <!-- Botones de factura -->
+                            <div class="d-flex gap-2 flex-wrap">
+                                @if (!string.IsNullOrEmpty(order.FacturaTravelioUrl))
+                                {
+                                    <a href="@order.FacturaTravelioUrl" target="_blank" class="btn btn-success">
+                                        🧾 Factura Travelio
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="text-center py-5 bg-light rounded-3">
+                    <div style="font-size: 4rem;" class="mb-3">🛒</div>
+                    <h5>Aún no tienes compras</h5>
+                    <p class="text-muted">Explora nuestros servicios y reserva tu próxima aventura.</p>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <a asp-controller="Autos" asp-action="Index" class="btn btn-primary">
+                            🚗 Ver Autos
+                        </a>
+                        <a asp-controller="Hoteles" asp-action="Index" class="btn btn-success">
+                            🏨 Ver Hoteles
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">👤 Mi cuenta</h5>
+                    <div class="mb-3">
+                        <label class="small text-muted fw-bold">Nombre</label>
+                        <div class="fs-5">@Model.Nombre @Model.Apellido</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="small text-muted fw-bold">Correo</label>
+                        <div>@Model.Email</div>
+                    </div>
+                    <div class="alert alert-success small mb-0">
+                        🔒 Tu cuenta está protegida.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Accesos rápidos -->
+            <div class="card shadow-sm border-0 mt-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3">🚀 Accesos rápidos</h6>
+                    <div class="d-grid gap-2">
+                        <a asp-controller="Autos" asp-action="Index" class="btn btn-outline-primary">
+                            🚗 Rentar un auto
+                        </a>
+                        <a asp-controller="Hoteles" asp-action="Index" class="btn btn-outline-success">
+                            🏨 Reservar hotel
+                        </a>
+                        <a asp-action="Carrito" class="btn btn-outline-secondary">
+                            🛒 Ver carrito
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

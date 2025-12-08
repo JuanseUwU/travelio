@@ -1,0 +1,280 @@
+@model BookingMvcDotNet.Models.HabitacionDetalleViewModel
+@{
+    ViewData["Title"] = $"{Model.Hotel} - {Model.NombreHabitacion}";
+}
+
+<div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Inicio</a></li>
+            <li class="breadcrumb-item"><a asp-controller="Hoteles" asp-action="Index">Hoteles</a></li>
+            <li class="breadcrumb-item active">@Model.NombreHabitacion</li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <!-- Galería de imágenes -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0">
+                @if (Model.Imagenes.Any())
+                {
+                    <div id="carouselHabitacion" class="carousel slide" data-bs-ride="carousel">
+                        <div class="carousel-inner">
+                            @for (var i = 0; i < Model.Imagenes.Length; i++)
+                            {
+                                var img = Model.Imagenes[i];
+                                var tieneImagen = !string.IsNullOrEmpty(img) && 
+                                    (img.StartsWith("http://") || img.StartsWith("https://"));
+                                <div class="carousel-item @(i == 0 ? "active" : "")">
+                                    @if (tieneImagen)
+                                    {
+                                        <img src="@img" class="d-block w-100" alt="Imagen @(i+1)"
+                                             style="height: 400px; object-fit: cover;"
+                                             onerror="this.src='https://via.placeholder.com/800x400?text=??';">
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex align-items-center justify-content-center"
+                                             style="height: 400px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                                            <span style="font-size: 8rem;">??</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        @if (Model.Imagenes.Length > 1)
+                        {
+                            <button class="carousel-control-prev" type="button" data-bs-target="#carouselHabitacion" data-bs-slide="prev">
+                                <span class="carousel-control-prev-icon"></span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#carouselHabitacion" data-bs-slide="next">
+                                <span class="carousel-control-next-icon"></span>
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center justify-content-center"
+                         style="height: 400px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                        <span style="font-size: 8rem;">??</span>
+                    </div>
+                }
+            </div>
+
+            <!-- Información del hotel -->
+            <div class="card shadow-sm border-0 mt-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-3">Sobre la habitación</h5>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Hotel:</strong> @Model.Hotel</p>
+                            <p class="mb-2"><strong>Tipo:</strong> @Model.TipoHabitacion</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Capacidad:</strong> @Model.Capacidad personas</p>
+                            <p class="mb-2"><strong>Ubicación:</strong> @Model.Ciudad, @Model.Pais</p>
+                        </div>
+                    </div>
+
+                    @if (Model.AmenidadesList.Any())
+                    {
+                        <h6 class="fw-bold mt-4 mb-3">Amenidades</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var amenidad in Model.AmenidadesList)
+                            {
+                                <span class="badge bg-light text-dark border">
+                                    <i class="bi bi-check-circle-fill text-success me-1"></i>@amenidad
+                                </span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de reserva -->
+        <div class="col-lg-5">
+            <div class="card shadow border-0 sticky-top" style="top: 2rem;">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h4 class="fw-bold mb-1">@Model.NombreHabitacion</h4>
+                            <p class="text-muted mb-0">@Model.Hotel</p>
+                        </div>
+                        <span class="badge bg-success">@Model.NombreProveedor</span>
+                    </div>
+
+                    <!-- Precio -->
+                    <div class="bg-light rounded p-3 mb-4">
+                        @if (Model.TieneDescuento)
+                        {
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="text-decoration-line-through text-muted">$@Model.PrecioNormal.ToString("N2")</span>
+                                <span class="badge bg-danger">-@Model.DescuentoPorcentaje.ToString("0")%</span>
+                            </div>
+                        }
+                        <div class="d-flex align-items-baseline gap-2">
+                            <span class="h2 fw-bold text-success mb-0">$@Model.PrecioActual.ToString("N2")</span>
+                            <span class="text-muted">/ noche</span>
+                        </div>
+                    </div>
+
+                    <!-- Formulario de reserva -->
+                    <form id="reserva-form">
+                        <input type="hidden" id="servicioId" value="@Model.ServicioId" />
+                        <input type="hidden" id="idHabitacion" value="@Model.IdHabitacion" />
+                        <input type="hidden" id="precioNoche" value="@Model.PrecioActual" />
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Check-in</label>
+                                <input type="date" class="form-control" id="fechaInicio" 
+                                       value="@Model.FechaInicio?.ToString("yyyy-MM-dd")"
+                                       min="@DateTime.Today.ToString("yyyy-MM-dd")" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold">Check-out</label>
+                                <input type="date" class="form-control" id="fechaFin"
+                                       value="@Model.FechaFin?.ToString("yyyy-MM-dd")" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Huéspedes</label>
+                            <select class="form-select" id="numeroHuespedes">
+                                @for (int i = 1; i <= Model.Capacidad; i++)
+                                {
+                                    <option value="@i" selected="@(i == Model.NumeroHuespedes)">
+                                        @i @(i == 1 ? "huésped" : "huéspedes")
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <!-- Resumen de precio -->
+                        <div class="border-top pt-3 mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">$@Model.PrecioActual.ToString("N2") x <span id="numNoches">@Model.NumeroNoches</span> noches</span>
+                                <span id="precioSubtotal">$@Model.PrecioTotal.ToString("N2")</span>
+                            </div>
+                            <div class="d-flex justify-content-between fw-bold fs-5">
+                                <span>Total</span>
+                                <span class="text-success" id="precioTotal">$@Model.PrecioTotal.ToString("N2")</span>
+                            </div>
+                        </div>
+
+                        <button type="button" id="btn-agregar" class="btn btn-success w-100 btn-lg fw-bold">
+                            <i class="bi bi-cart-plus me-2"></i> Agregar al carrito
+                        </button>
+                    </form>
+
+                    <div class="text-center mt-3">
+                        <small class="text-muted">
+                            <i class="bi bi-shield-check"></i> Cancelación gratuita según política del hotel
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fechaInicio = document.getElementById('fechaInicio');
+            const fechaFin = document.getElementById('fechaFin');
+            const precioNoche = parseFloat(document.getElementById('precioNoche').value);
+            const numNochesEl = document.getElementById('numNoches');
+            const precioSubtotalEl = document.getElementById('precioSubtotal');
+            const precioTotalEl = document.getElementById('precioTotal');
+            const btnAgregar = document.getElementById('btn-agregar');
+
+            function calcularPrecio() {
+                if (fechaInicio.value && fechaFin.value) {
+                    const inicio = new Date(fechaInicio.value);
+                    const fin = new Date(fechaFin.value);
+                    const noches = Math.max(1, Math.ceil((fin - inicio) / (1000 * 60 * 60 * 24)));
+                    const total = precioNoche * noches;
+
+                    numNochesEl.textContent = noches;
+                    precioSubtotalEl.textContent = '$' + total.toFixed(2);
+                    precioTotalEl.textContent = '$' + total.toFixed(2);
+                }
+            }
+
+            fechaInicio.addEventListener('change', function() {
+                // Asegurar que check-out sea después de check-in
+                if (fechaInicio.value) {
+                    const minCheckout = new Date(fechaInicio.value);
+                    minCheckout.setDate(minCheckout.getDate() + 1);
+                    fechaFin.min = minCheckout.toISOString().split('T')[0];
+                    
+                    if (fechaFin.value && new Date(fechaFin.value) <= new Date(fechaInicio.value)) {
+                        fechaFin.value = minCheckout.toISOString().split('T')[0];
+                    }
+                }
+                calcularPrecio();
+            });
+
+            fechaFin.addEventListener('change', calcularPrecio);
+
+            btnAgregar.addEventListener('click', function() {
+                if (!fechaInicio.value || !fechaFin.value) {
+                    Swal.fire('Error', 'Por favor selecciona las fechas de check-in y check-out', 'warning');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('servicioId', document.getElementById('servicioId').value);
+                formData.append('idHabitacion', document.getElementById('idHabitacion').value);
+                formData.append('fechaInicio', fechaInicio.value);
+                formData.append('fechaFin', fechaFin.value);
+                formData.append('numeroHuespedes', document.getElementById('numeroHuespedes').value);
+
+                btnAgregar.disabled = true;
+                btnAgregar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verificando...';
+
+                fetch('@Url.Action("AgregarAlCarrito", "Hoteles")', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(data => {
+                    btnAgregar.disabled = false;
+                    btnAgregar.innerHTML = '<i class="bi bi-cart-plus me-2"></i> Agregar al carrito';
+
+                    if (data.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Agregado!',
+                            text: data.message,
+                            showCancelButton: true,
+                            confirmButtonText: 'Ir al carrito',
+                            cancelButtonText: 'Seguir buscando'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.location.href = '@Url.Action("Carrito", "Home")';
+                            }
+                        });
+
+                        // Actualizar badge del carrito
+                        const badge = document.querySelector('.cart-badge');
+                        if (badge) badge.textContent = data.totalCount;
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(err => {
+                    btnAgregar.disabled = false;
+                    btnAgregar.innerHTML = '<i class="bi bi-cart-plus me-2"></i> Agregar al carrito';
+                    Swal.fire('Error', 'No se pudo agregar al carrito', 'error');
+                });
+            });
+        });
+    </script>
+}

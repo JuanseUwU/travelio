@@ -1,0 +1,205 @@
+@model BookingMvcDotNet.Models.VueloDetalleViewModel
+@{
+    ViewData["Title"] = $"{Model.Origen} ? {Model.Destino}";
+}
+
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Inicio</a></li>
+            <li class="breadcrumb-item"><a asp-controller="Vuelos" asp-action="Index">Vuelos</a></li>
+            <li class="breadcrumb-item active">@Model.Origen ? @Model.Destino</li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <div style="font-size: 5rem;">??</div>
+                        <h2 class="fw-bold">@Model.NombreAerolinea</h2>
+                        <span class="badge bg-warning text-dark fs-6">@Model.NombreProveedor</span>
+                    </div>
+
+                    <div class="row text-center mb-4">
+                        <div class="col-5">
+                            <h3 class="fw-bold text-primary">@Model.Origen</h3>
+                            <p class="text-muted">Origen</p>
+                        </div>
+                        <div class="col-2 d-flex align-items-center justify-content-center">
+                            <div>
+                                <div class="text-muted">?</div>
+                                <small class="text-muted">@Model.Fecha.ToString("HH:mm")</small>
+                            </div>
+                        </div>
+                        <div class="col-5">
+                            <h3 class="fw-bold text-success">@Model.Destino</h3>
+                            <p class="text-muted">Destino</p>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="bg-light rounded p-3">
+                                <small class="text-muted">Fecha de vuelo</small>
+                                <div class="fw-bold">@Model.Fecha.ToString("dddd, dd MMMM yyyy")</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="bg-light rounded p-3">
+                                <small class="text-muted">Tipo de cabina</small>
+                                <div class="fw-bold">@Model.TipoCabina</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="bg-light rounded p-3">
+                                <small class="text-muted">Asientos disponibles</small>
+                                <div class="fw-bold">@Model.AsientosDisponibles de @Model.CapacidadPasajeros</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="bg-light rounded p-3">
+                                <small class="text-muted">Código de vuelo</small>
+                                <div class="fw-bold">@Model.IdVuelo</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow border-0 sticky-top" style="top: 2rem;">
+                <div class="card-body p-4">
+                    <h4 class="fw-bold mb-3">Reservar vuelo</h4>
+
+                    <div class="bg-light rounded p-3 mb-4">
+                        @if (Model.TieneDescuento)
+                        {
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="text-decoration-line-through text-muted">$@Model.PrecioNormal.ToString("N2")</span>
+                                <span class="badge bg-danger">-@Model.DescuentoPorcentaje.ToString("0")%</span>
+                            </div>
+                        }
+                        <div class="d-flex align-items-baseline gap-2">
+                            <span class="h2 fw-bold text-warning mb-0">$@Model.PrecioActual.ToString("N2")</span>
+                            <span class="text-muted">/ persona</span>
+                        </div>
+                    </div>
+
+                    <form id="reserva-form">
+                        <input type="hidden" id="servicioId" value="@Model.ServicioId" />
+                        <input type="hidden" id="idVuelo" value="@Model.IdVuelo" />
+                        <input type="hidden" id="precioUnitario" value="@Model.PrecioActual" />
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Número de pasajeros</label>
+                            <select class="form-select" id="pasajeros">
+                                @for (int i = 1; i <= Math.Min(10, Model.AsientosDisponibles); i++)
+                                {
+                                    <option value="@i" selected="@(i == Model.NumeroPasajeros)">
+                                        @i @(i == 1 ? "pasajero" : "pasajeros")
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="border-top pt-3 mb-3">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">$@Model.PrecioActual.ToString("N2") x <span id="numPasajeros">@Model.NumeroPasajeros</span> pasajero(s)</span>
+                                <span id="precioSubtotal">$@Model.PrecioTotal.ToString("N2")</span>
+                            </div>
+                            <div class="d-flex justify-content-between fw-bold fs-5">
+                                <span>Total</span>
+                                <span class="text-warning" id="precioTotal">$@Model.PrecioTotal.ToString("N2")</span>
+                            </div>
+                        </div>
+
+                        <button type="button" id="btn-agregar" class="btn btn-warning w-100 btn-lg fw-bold">
+                            ?? Agregar al carrito
+                        </button>
+                    </form>
+
+                    <div class="text-center mt-3">
+                        <small class="text-muted">
+                            ??? Cambios sujetos a disponibilidad y políticas de la aerolínea
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const pasajeros = document.getElementById('pasajeros');
+            const precioUnitario = parseFloat(document.getElementById('precioUnitario').value);
+            const numPasajerosEl = document.getElementById('numPasajeros');
+            const precioSubtotalEl = document.getElementById('precioSubtotal');
+            const precioTotalEl = document.getElementById('precioTotal');
+            const btnAgregar = document.getElementById('btn-agregar');
+
+            function calcularPrecio() {
+                const num = parseInt(pasajeros.value);
+                const total = precioUnitario * num;
+
+                numPasajerosEl.textContent = num;
+                precioSubtotalEl.textContent = '$' + total.toFixed(2);
+                precioTotalEl.textContent = '$' + total.toFixed(2);
+            }
+
+            pasajeros.addEventListener('change', calcularPrecio);
+
+            btnAgregar.addEventListener('click', function() {
+                const formData = new FormData();
+                formData.append('servicioId', document.getElementById('servicioId').value);
+                formData.append('idVuelo', document.getElementById('idVuelo').value);
+                formData.append('pasajeros', pasajeros.value);
+
+                btnAgregar.disabled = true;
+                btnAgregar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verificando...';
+
+                fetch('@Url.Action("AgregarAlCarrito", "Vuelos")', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(data => {
+                    btnAgregar.disabled = false;
+                    btnAgregar.innerHTML = '?? Agregar al carrito';
+
+                    if (data.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Agregado!',
+                            text: data.message,
+                            showCancelButton: true,
+                            confirmButtonText: 'Ir al carrito',
+                            cancelButtonText: 'Seguir buscando'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.location.href = '@Url.Action("Carrito", "Home")';
+                            }
+                        });
+
+                        const badge = document.querySelector('.cart-badge');
+                        if (badge) badge.textContent = data.totalCount;
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(err => {
+                    btnAgregar.disabled = false;
+                    btnAgregar.innerHTML = '?? Agregar al carrito';
+                    Swal.fire('Error', 'No se pudo agregar al carrito', 'error');
+                });
+            });
+        });
+    </script>
+}

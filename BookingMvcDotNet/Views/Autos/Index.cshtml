@@ -1,0 +1,193 @@
+@model BookingMvcDotNet.Models.AutosSearchViewModel
+@{
+    ViewData["Title"] = "Renta de Autos";
+    
+    // Función para obtener imagen de respaldo según tipo de vehículo
+    string GetFallbackImage(string tipo) {
+        var tipoLower = tipo?.ToLower() ?? "";
+        if (tipoLower.Contains("suv") || tipoLower.Contains("sportage") || tipoLower.Contains("tucson"))
+            return "https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?w=400&h=250&fit=crop";
+        if (tipoLower.Contains("sedan") || tipoLower.Contains("corolla") || tipoLower.Contains("civic"))
+            return "https://images.unsplash.com/photo-1550355291-bbee04a92027?w=400&h=250&fit=crop";
+        if (tipoLower.Contains("pickup") || tipoLower.Contains("camioneta") || tipoLower.Contains("hilux"))
+            return "https://images.unsplash.com/photo-1559416523-140ddc3d238c?w=400&h=250&fit=crop";
+        if (tipoLower.Contains("yaris") || tipoLower.Contains("economico") || tipoLower.Contains("compacto"))
+            return "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=400&h=250&fit=crop";
+        if (tipoLower.Contains("van") || tipoLower.Contains("minivan"))
+            return "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=250&fit=crop";
+        if (tipoLower.Contains("lujo") || tipoLower.Contains("premium") || tipoLower.Contains("mercedes") || tipoLower.Contains("bmw"))
+            return "https://images.unsplash.com/photo-1555215695-3004980ad54e?w=400&h=250&fit=crop";
+        return "https://images.unsplash.com/photo-1502877338535-766e1452684a?w=400&h=250&fit=crop";
+    }
+}
+
+<div class="container py-4">
+    <!-- Header con gradiente -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="p-4 rounded-4 text-white mb-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <h1 class="display-5 fw-bold mb-2"><i class="bi bi-car-front"></i> Renta de Vehículos</h1>
+                <p class="mb-0 opacity-90">6 proveedores integrados - SUVs, Sedanes, Pickups y más</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de búsqueda -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" asp-action="Index">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Ciudad</label>
+                        <input type="text" class="form-control" name="ciudad" value="@Model.Ciudad" placeholder="Ej: Cuenca">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Fecha Recogida</label>
+                        <input type="date" class="form-control" name="fechaInicio"
+                               value="@Model.FechaInicio?.ToString("yyyy-MM-dd")"
+                               min="@DateTime.Today.ToString("yyyy-MM-dd")">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Fecha Entrega</label>
+                        <input type="date" class="form-control" name="fechaFin"
+                               value="@Model.FechaFin?.ToString("yyyy-MM-dd")">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Capacidad mín.</label>
+                        <input type="number" class="form-control" name="capacidad" value="@Model.Capacidad" min="1" max="15">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Precio máx.</label>
+                        <input type="number" class="form-control" name="precioMax" value="@Model.PrecioMax" min="0" step="10">
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100" id="btnBuscar">
+                            <span class="spinner-border spinner-border-sm d-none" id="spinnerBuscar"></span>
+                            <span id="textoBuscar">??</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mensaje de error -->
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+
+    <!-- Resultados -->
+    @if (Model.Resultados.Any())
+    {
+        <p class="text-muted mb-3">@Model.Resultados.Count vehículos encontrados</p>
+
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            @foreach (var auto in Model.Resultados)
+            {
+                var fallbackImg = GetFallbackImage(auto.Tipo);
+                var tieneImagenValida = !string.IsNullOrEmpty(auto.UriImagen) && 
+                                        (auto.UriImagen.StartsWith("http://") || auto.UriImagen.StartsWith("https://"));
+                var imagenFinal = tieneImagenValida ? auto.UriImagen : fallbackImg;
+                
+                <div class="col">
+                    <div class="card h-100 shadow-sm auto-card">
+                        <!-- Imagen del auto -->
+                        <div class="position-relative">
+                            <img src="@imagenFinal" class="card-img-top" alt="@auto.Tipo"
+                                 style="height: 200px; object-fit: cover;"
+                                 onerror="this.src='@fallbackImg';">
+
+                            @if (auto.TieneDescuento)
+                            {
+                                <span class="position-absolute top-0 end-0 m-2 badge bg-danger fs-6">
+                                    <i class="bi bi-fire"></i> -@auto.DescuentoPorcentaje.ToString("0")%
+                                </span>
+                            }
+                            <span class="position-absolute bottom-0 start-0 m-2 badge bg-primary">
+                                @auto.NombreProveedor
+                            </span>
+                        </div>
+
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold mb-1">@auto.Tipo</h5>
+                            <p class="text-muted small mb-2">
+                                <i class="bi bi-geo-alt"></i> @auto.Ciudad, @auto.Pais
+                            </p>
+
+                            <div class="d-flex gap-2 mb-3">
+                                <span class="badge bg-light text-dark border"><i class="bi bi-people"></i> @auto.CapacidadPasajeros pasajeros</span>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-end">
+                                <div>
+                                    @if (auto.TieneDescuento)
+                                    {
+                                        <small class="text-muted text-decoration-line-through">$@auto.PrecioNormalPorDia.ToString("N2")</small>
+                                    }
+                                    <div class="fw-bold text-primary fs-4">
+                                        $@auto.PrecioActualPorDia.ToString("N2") <small class="text-muted fw-normal fs-6">/día</small>
+                                    </div>
+                                </div>
+
+                                <a asp-action="Detalle"
+                                   asp-route-servicioId="@auto.ServicioId"
+                                   asp-route-idAuto="@auto.IdAuto"
+                                   asp-route-fechaInicio="@Model.FechaInicio?.ToString("yyyy-MM-dd")"
+                                   asp-route-fechaFin="@Model.FechaFin?.ToString("yyyy-MM-dd")"
+                                   class="btn btn-primary">
+                                    Ver más ?
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="text-center py-5">
+            <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=300&h=200&fit=crop" 
+                 class="rounded-4 mb-4 shadow" alt="Autos">
+            <h4 class="fw-bold"><i class="bi bi-search"></i> Busca tu vehículo ideal</h4>
+            <p class="text-muted">Selecciona fechas y ciudad para ver disponibilidad en tiempo real</p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap mt-3">
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-car-front"></i> Cuenca Wheels</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-car-front"></i> LojitaGO</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-car-front"></i> EasyCar</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-car-front"></i> Auto Car Rent</span>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .auto-card {
+        transition: all 0.3s ease;
+        border: none;
+        border-radius: 16px;
+        overflow: hidden;
+    }
+    .auto-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 35px rgba(0,0,0,.15) !important;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        const btnBuscar = document.getElementById('btnBuscar');
+        const spinner = document.getElementById('spinnerBuscar');
+        const texto = document.getElementById('textoBuscar');
+
+        if (form) {
+            form.addEventListener('submit', function() {
+                btnBuscar.disabled = true;
+                spinner.classList.remove('d-none');
+                texto.textContent = '...';
+            });
+        }
+    });
+</script>

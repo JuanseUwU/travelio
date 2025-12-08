@@ -1,0 +1,161 @@
+/* IMPORTAR FUENTE MODERNA (Inter) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+:root {
+    /* Paleta de colores estilo Lovable */
+    --primary-orange: #F36F21; /* El naranja del botón */
+    --primary-orange-hover: #d65a12;
+    --dark-blue: #0F172A; /* Color de texto y logo */
+    --light-bg: #F8FAFC;
+    --border-radius-lg: 16px;
+    --border-radius-md: 12px;
+    --box-shadow-soft: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    color: var(--dark-blue);
+    background-color: #ffffff;
+}
+
+/* --- NAVBAR --- */
+.navbar {
+    background-color: #ffffff !important; /* Forzar blanco */
+    box-shadow: none;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.navbar-brand {
+    color: var(--dark-blue) !important;
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-link {
+    color: #64748B !important; /* Gris suave */
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: color 0.2s;
+}
+
+    .nav-link:hover, .nav-link.active {
+        color: var(--dark-blue) !important;
+    }
+
+/* --- BOTONES --- */
+.btn-primary {
+    background-color: var(--primary-orange);
+    border-color: var(--primary-orange);
+    border-radius: 50px; /* Botones redondos estilo pill */
+    padding: 0.5rem 1.5rem;
+    font-weight: 600;
+    box-shadow: 0 4px 6px rgba(243, 111, 33, 0.2);
+    transition: all 0.3s ease;
+}
+
+    .btn-primary:hover {
+        background-color: var(--primary-orange-hover);
+        border-color: var(--primary-orange-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 12px rgba(243, 111, 33, 0.3);
+    }
+
+/* --- HERO SECTION --- */
+.hero-container {
+    position: relative;
+    margin-bottom: 100px; /* Espacio para el buscador flotante */
+}
+
+.hero-image {
+    border-radius: var(--border-radius-lg);
+    height: 500px;
+    width: 100%;
+    object-fit: cover;
+    filter: brightness(0.85); /* Oscurecer un poco para que se lea el texto */
+}
+
+.hero-content {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    width: 90%;
+    max-width: 800px;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+/* --- BUSCADOR FLOTANTE (LA CLAVE DEL DISEÑO) --- */
+.search-card {
+    background: white;
+    border-radius: var(--border-radius-lg);
+    padding: 2rem;
+    box-shadow: var(--box-shadow-soft);
+    margin-top: -80px; /* Esto hace que se monte sobre la foto */
+    position: relative;
+    z-index: 10;
+    border: 1px solid #f1f5f9;
+}
+
+/* --- CATEGORÍAS (ICONOS GRANDES) --- */
+.category-card {
+    border: 1px solid #e2e8f0;
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    background: white;
+    height: 100%;
+    cursor: pointer;
+    text-decoration: none !important;
+    color: var(--dark-blue);
+    display: block;
+}
+
+    .category-card:hover {
+        border-color: var(--primary-orange);
+        transform: translateY(-5px);
+        box-shadow: var(--box-shadow-soft);
+    }
+
+.category-icon {
+    background-color: #eff6ff; /* Azul muy clarito */
+    color: #3b82f6;
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem auto;
+    font-size: 1.5rem;
+}
+
+/* --- TARJETAS DE PRODUCTO --- */
+.product-card {
+    border: none;
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    transition: all 0.3s;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--box-shadow-soft);
+    }
+
+.product-img-container {
+    height: 200px;
+    background-color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}

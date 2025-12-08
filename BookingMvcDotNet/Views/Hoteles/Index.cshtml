@@ -1,0 +1,233 @@
+@model BookingMvcDotNet.Models.HabitacionesSearchViewModel
+@{
+    ViewData["Title"] = "Hoteles";
+    
+    // Función para obtener imagen de respaldo según tipo de habitación
+    string GetFallbackImage(string tipo, string hotel) {
+        var tipoLower = (tipo?.ToLower() ?? "") + " " + (hotel?.ToLower() ?? "");
+        if (tipoLower.Contains("suite") || tipoLower.Contains("premium") || tipoLower.Contains("lujo"))
+            return "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=400&h=250&fit=crop";
+        if (tipoLower.Contains("doble") || tipoLower.Contains("matrimonial"))
+            return "https://images.unsplash.com/photo-1590490360182-c33d57733427?w=400&h=250&fit=crop";
+        if (tipoLower.Contains("familiar") || tipoLower.Contains("family"))
+            return "https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=400&h=250&fit=crop";
+        if (tipoLower.Contains("individual") || tipoLower.Contains("single"))
+            return "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=400&h=250&fit=crop";
+        return "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=400&h=250&fit=crop";
+    }
+}
+
+<div class="container py-4">
+    <!-- Header con gradiente -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="p-4 rounded-4 text-white mb-3" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                <h1 class="display-5 fw-bold mb-2"><i class="bi bi-building"></i> Hoteles y Habitaciones</h1>
+                <p class="mb-0 opacity-90">6 hoteles integrados - Suites, Dobles, Familiares y más</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de búsqueda -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" asp-action="Index">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Ciudad</label>
+                        <input type="text" class="form-control" name="ciudad" value="@Model.Ciudad" placeholder="Ej: Cuenca">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Check-in</label>
+                        <input type="date" class="form-control" name="fechaInicio"
+                               value="@Model.FechaInicio?.ToString("yyyy-MM-dd")"
+                               min="@DateTime.Today.ToString("yyyy-MM-dd")">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Check-out</label>
+                        <input type="date" class="form-control" name="fechaFin"
+                               value="@Model.FechaFin?.ToString("yyyy-MM-dd")">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Huéspedes</label>
+                        <input type="number" class="form-control" name="numeroHuespedes" 
+                               value="@Model.NumeroHuespedes" min="1" max="10">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tipo</label>
+                        <select class="form-select" name="tipoHabitacion">
+                            <option value="">Todos</option>
+                            <option value="Individual" selected="@(Model.TipoHabitacion == "Individual")">Individual</option>
+                            <option value="Doble" selected="@(Model.TipoHabitacion == "Doble")">Doble</option>
+                            <option value="Suite" selected="@(Model.TipoHabitacion == "Suite")">Suite</option>
+                            <option value="Familiar" selected="@(Model.TipoHabitacion == "Familiar")">Familiar</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100" id="btnBuscar">
+                            <span class="spinner-border spinner-border-sm d-none" id="spinnerBuscar"></span>
+                            <span id="textoBuscar">?? Buscar</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Filtros adicionales colapsables -->
+                <div class="collapse mt-3" id="filtrosAvanzados">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Precio mínimo</label>
+                            <input type="number" class="form-control" name="precioMin" 
+                                   value="@Model.PrecioMin" min="0" step="10" placeholder="$0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Precio máximo</label>
+                            <input type="number" class="form-control" name="precioMax" 
+                                   value="@Model.PrecioMax" min="0" step="10" placeholder="Sin límite">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Capacidad mínima</label>
+                            <input type="number" class="form-control" name="capacidad" 
+                                   value="@Model.Capacidad" min="1" max="10">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-2">
+                    <a class="btn btn-link btn-sm" data-bs-toggle="collapse" href="#filtrosAvanzados">
+                        <i class="bi bi-sliders"></i> Filtros avanzados
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Mensaje de error -->
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+
+    <!-- Resultados -->
+    @if (Model.Resultados.Any())
+    {
+        <p class="text-muted mb-3">@Model.Resultados.Count habitaciones encontradas</p>
+
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            @foreach (var hab in Model.Resultados)
+            {
+                var fallbackImg = GetFallbackImage(hab.TipoHabitacion, hab.Hotel);
+                var tieneImagen = !string.IsNullOrEmpty(hab.ImagenPrincipal) && 
+                    (hab.ImagenPrincipal.StartsWith("http://") || hab.ImagenPrincipal.StartsWith("https://"));
+                var imagenFinal = tieneImagen ? hab.ImagenPrincipal : fallbackImg;
+                
+                <div class="col">
+                    <div class="card h-100 shadow-sm hotel-card">
+                        <!-- Imagen -->
+                        <div class="position-relative">
+                            <img src="@imagenFinal" class="card-img-top" alt="@hab.NombreHabitacion"
+                                 style="height: 200px; object-fit: cover;"
+                                 onerror="this.src='@fallbackImg';">
+
+                            @if (hab.TieneDescuento)
+                            {
+                                <span class="position-absolute top-0 end-0 m-2 badge bg-danger fs-6">
+                                    <i class="bi bi-fire"></i> -@hab.DescuentoPorcentaje.ToString("0")%
+                                </span>
+                            }
+                            <span class="position-absolute bottom-0 start-0 m-2 badge bg-success">
+                                @hab.NombreProveedor
+                            </span>
+                        </div>
+
+                        <div class="card-body">
+                            <h6 class="text-muted mb-1 small">@hab.Hotel</h6>
+                            <h5 class="card-title fw-bold mb-1">@hab.NombreHabitacion</h5>
+                            <p class="text-muted small mb-2">
+                                <i class="bi bi-geo-alt"></i> @hab.Ciudad, @hab.Pais
+                            </p>
+
+                            <div class="d-flex flex-wrap gap-1 mb-3">
+                                <span class="badge bg-light text-dark border"><i class="bi bi-people"></i> @hab.Capacidad personas</span>
+                                <span class="badge bg-info text-white">@hab.TipoHabitacion</span>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(hab.Amenidades))
+                            {
+                                <p class="small text-muted mb-2">
+                                    ? @(hab.Amenidades.Length > 50 ? hab.Amenidades.Substring(0, 50) + "..." : hab.Amenidades)
+                                </p>
+                            }
+
+                            <div class="d-flex justify-content-between align-items-end">
+                                <div>
+                                    @if (hab.TieneDescuento)
+                                    {
+                                        <small class="text-muted text-decoration-line-through">$@hab.PrecioNormal.ToString("N2")</small>
+                                    }
+                                    <div class="fw-bold text-success fs-4">
+                                        $@hab.PrecioActual.ToString("N2") <small class="text-muted fw-normal fs-6">/noche</small>
+                                    </div>
+                                </div>
+
+                                <a asp-action="Detalle"
+                                   asp-route-servicioId="@hab.ServicioId"
+                                   asp-route-idHabitacion="@hab.IdHabitacion"
+                                   asp-route-fechaInicio="@Model.FechaInicio?.ToString("yyyy-MM-dd")"
+                                   asp-route-fechaFin="@Model.FechaFin?.ToString("yyyy-MM-dd")"
+                                   asp-route-numeroHuespedes="@Model.NumeroHuespedes"
+                                   class="btn btn-success">
+                                    Ver más ?
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="text-center py-5">
+            <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?w=300&h=200&fit=crop" 
+                 class="rounded-4 mb-4 shadow" alt="Hotel">
+            <h4 class="fw-bold"><i class="bi bi-search"></i> Encuentra tu habitación ideal</h4>
+            <p class="text-muted">Selecciona fechas y destino para ver disponibilidad</p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap mt-3">
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-building"></i> Hotel Campestre</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-building"></i> AllpahouseNYC</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-building"></i> Brisamar</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-building"></i> Hotel Andino</span>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .hotel-card {
+        transition: all 0.3s ease;
+        border: none;
+        border-radius: 16px;
+        overflow: hidden;
+    }
+    .hotel-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 35px rgba(0,0,0,.15) !important;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        const btnBuscar = document.getElementById('btnBuscar');
+        const spinner = document.getElementById('spinnerBuscar');
+        const texto = document.getElementById('textoBuscar');
+
+        if (form) {
+            form.addEventListener('submit', function() {
+                btnBuscar.disabled = true;
+                spinner.classList.remove('d-none');
+                texto.textContent = 'Buscando...';
+            });
+        }
+    });
+</script>

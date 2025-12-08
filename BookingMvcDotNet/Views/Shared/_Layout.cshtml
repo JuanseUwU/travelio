@@ -1,0 +1,189 @@
+﻿@using BookingMvcDotNet.Models
+@using Microsoft.AspNetCore.Http
+
+@{
+    var title = ViewData["Title"] as string ?? "Inicio";
+
+    // LEER DATOS DE SESIÓN
+    var userEmail = Context.Session.GetString("UserEmail");
+    var userName = Context.Session.GetString("UserName");
+    var isAdmin = Context.Session.GetString("IsAdmin") == "True";
+    var isLoggedIn = !string.IsNullOrEmpty(userEmail);
+
+    // Carrito (solo se calcula si no es admin, para optimizar)
+    var cartList = Context.Session.Get<List<CartItemViewModel>>("MyCartSession");
+    var cartCount = cartList?.Sum(x => x.Cantidad) ?? 0;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@title - Travelio</title>
+
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="d-flex flex-column min-vh-100 bg-light">
+
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top border-bottom shadow-sm" style="z-index: 1030;">
+            <div class="container">
+                <a class="navbar-brand fw-bold text-dark d-flex align-items-center gap-2" asp-controller="Home" asp-action="Index">
+                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
+                         style="width: 32px; height: 32px;">
+                        <i class="bi bi-airplane-fill" style="font-size: 16px; transform: rotate(-45deg);"></i>
+                    </div>
+                    Travelio
+                </a>
+
+                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+
+                        @* ==================================================== *@
+                        @* LÓGICA DEL MENÚ: ADMIN vs USUARIO/INVITADO          *@
+                        @* ==================================================== *@
+
+                        @if (isLoggedIn && isAdmin)
+                        {
+                            // --- MENÚ EXCLUSIVO DE ADMINISTRADOR ---
+                            // Solo ve el botón del Panel y Salir. Nada más.
+
+                            <li class="nav-item ms-lg-3">
+                                <a class="btn btn-danger text-white rounded-pill px-4 fw-semibold btn-sm"
+                                   asp-controller="Home" asp-action="Admin">
+                                    <i class="bi bi-shield-lock-fill me-1"></i> Panel Admin
+                                </a>
+                            </li>
+                            <li class="nav-item ms-2">
+                                <a class="btn btn-outline-secondary btn-sm rounded-pill px-3" asp-controller="Home" asp-action="Logout">
+                                    Salir
+                                </a>
+                            </li>
+                        }
+                        else
+                        {
+                            // --- MENÚ PARA USUARIOS Y VISITANTES ---
+
+                            // 1. Links de Navegación
+                            <li class="nav-item">
+                                <a class="nav-link text-secondary fw-medium" asp-controller="Home" asp-action="Index">Explorar</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-secondary fw-medium" asp-controller="Home" asp-action="Modules">Módulos</a>
+                            </li>
+
+                            // 2. Carrito (Siempre visible para no admins)
+                            <li class="nav-item ms-lg-3">
+                                <a class="nav-link position-relative btn btn-light border-0 rounded-pill px-3 d-flex align-items-center gap-2"
+                                   asp-controller="Home" asp-action="Carrito" style="background-color: #f1f5f9;">
+                                    <i class="bi bi-cart-fill text-dark"></i>
+                                    <span class="text-dark small fw-bold">Carrito</span>
+                                    <span id="cart-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light @(cartCount > 0 ? "" : "d-none")">
+                                        @cartCount
+                                        <span class="visually-hidden">items</span>
+                                    </span>
+                                </a>
+                            </li>
+
+                            // 3. Área de Usuario (Logueado vs Invitado)
+                            @if (isLoggedIn)
+                            {
+                                <li class="nav-item ms-lg-3 border-start ps-lg-3">
+                                    <a class="nav-link fw-bold text-primary" asp-controller="Home" asp-action="Profile">
+                                        <i class="bi bi-person-circle me-1"></i> Hola, @userName
+                                    </a>
+                                </li>
+                                <li class="nav-item ms-2">
+                                    <a class="btn btn-outline-secondary btn-sm rounded-pill px-3" asp-controller="Home" asp-action="Logout">Salir</a>
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="nav-item ms-lg-3 border-start ps-lg-3">
+                                    <a class="btn btn-link text-decoration-none text-dark fw-semibold" asp-controller="Home" asp-action="Login">Log in</a>
+                                </li>
+                                <li class="nav-item ms-2">
+                                    <a class="btn btn-primary text-white rounded-pill px-4 fw-semibold shadow-sm" asp-controller="Home" asp-action="Register">Registrarse</a>
+                                </li>
+                            }
+                        }
+
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div style="height: 80px;"></div>
+
+    <div class="container flex-grow-1 my-4">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="bg-white border-top py-4 mt-auto">
+        <div class="container text-center">
+            <div class="mb-2"><i class="bi bi-airplane-fill text-primary"></i></div>
+            <p class="text-muted small mb-0">&copy; @DateTime.Now.Year – <strong>Travelio</strong></p>
+        </div>
+    </footer>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.3/jquery.validate.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validation-unobtrusive/3.2.12/jquery.validate.unobtrusive.min.js"></script>
+
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+
+    <script>
+        function agregarItem(tipo, titulo) {
+            let formData = new FormData();
+            formData.append('tipo', tipo);
+            formData.append('titulo', titulo);
+
+            fetch('/Home/AgregarAlCarritoApi', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    actualizarBadge(data.totalCount);
+                    const Toast = Swal.mixin({
+                        toast: true, position: 'top-end', showConfirmButton: false,
+                        timer: 2000, timerProgressBar: true,
+                        didOpen: (toast) => { toast.onmouseenter = Swal.stopTimer; toast.onmouseleave = Swal.resumeTimer; }
+                    });
+                    Toast.fire({ icon: 'success', title: data.message });
+                }
+            });
+        }
+
+        function actualizarBadge(count) {
+            const badge = document.getElementById('cart-badge');
+            if (badge) {
+                badge.innerText = count;
+                if (count > 0) badge.classList.remove('d-none');
+                else badge.classList.add('d-none');
+            }
+        }
+
+        window.addEventListener('pageshow', function(event) {
+            fetch('/Home/GetCartCount')
+                .then(r => r.json())
+                .then(d => actualizarBadge(d.count));
+        });
+    </script>
+</body>
+</html>

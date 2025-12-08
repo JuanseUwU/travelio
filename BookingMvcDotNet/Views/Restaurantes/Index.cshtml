@@ -1,0 +1,189 @@
+@model BookingMvcDotNet.Models.MesasSearchViewModel
+@{
+    ViewData["Title"] = "Restaurantes";
+    
+    // Imágenes de restaurantes según nombre
+    string GetRestaurantImage(string nombre) {
+        var n = nombre?.ToLower() ?? "";
+        if (n.Contains("cangrejito") || n.Contains("mariscos") || n.Contains("7 mares"))
+            return "https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=400&h=250&fit=crop";
+        if (n.Contains("dragon") || n.Contains("asiatico") || n.Contains("chino"))
+            return "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400&h=250&fit=crop";
+        if (n.Contains("sanctum") || n.Contains("gourmet") || n.Contains("elegante"))
+            return "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=250&fit=crop";
+        if (n.Contains("andino") || n.Contains("tipico") || n.Contains("tradicional"))
+            return "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=250&fit=crop";
+        if (n.Contains("bar") || n.Contains("sinson"))
+            return "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=250&fit=crop";
+        if (n.Contains("cafe") || n.Contains("san juan"))
+            return "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400&h=250&fit=crop";
+        return "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=250&fit=crop";
+    }
+    
+    string GetRestaurantEmoji(string nombre) {
+        var n = nombre?.ToLower() ?? "";
+        if (n.Contains("cangrejito") || n.Contains("mariscos") || n.Contains("7 mares")) return "??";
+        if (n.Contains("dragon") || n.Contains("asiatico") || n.Contains("chino")) return "??";
+        if (n.Contains("sanctum") || n.Contains("gourmet")) return "??";
+        if (n.Contains("andino") || n.Contains("tipico")) return "???";
+        if (n.Contains("bar") || n.Contains("sinson")) return "??";
+        if (n.Contains("cafe")) return "?";
+        return "???";
+    }
+}
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="p-4 rounded-4 text-white mb-3" style="background: linear-gradient(135deg, #ff6b6b 0%, #feca57 100%);">
+                <h1 class="display-5 fw-bold mb-2"><i class="bi bi-cup-straw"></i> Restaurantes</h1>
+                <p class="mb-0 opacity-90">7 restaurantes integrados - Mariscos, Asiático, Gourmet y más</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" asp-action="Index">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Fecha</label>
+                        <input type="date" class="form-control" name="fecha"
+                               value="@Model.Fecha?.ToString("yyyy-MM-dd")"
+                               min="@DateTime.Today.ToString("yyyy-MM-dd")">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Personas</label>
+                        <input type="number" class="form-control" name="numeroPersonas" 
+                               value="@Model.NumeroPersonas" min="1" max="20">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Capacidad mín.</label>
+                        <input type="number" class="form-control" name="capacidad" 
+                               value="@Model.Capacidad" min="1" max="20">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Tipo de Mesa</label>
+                        <select class="form-select" name="tipoMesa">
+                            <option value="">Todas</option>
+                            <option value="Interior" selected="@(Model.TipoMesa == "Interior")">Interior</option>
+                            <option value="Exterior" selected="@(Model.TipoMesa == "Exterior")">Exterior/Terraza</option>
+                            <option value="VIP" selected="@(Model.TipoMesa == "VIP")">VIP</option>
+                            <option value="Privado" selected="@(Model.TipoMesa == "Privado")">Privado</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100" id="btnBuscar">
+                            <span class="spinner-border spinner-border-sm d-none" id="spinnerBuscar"></span>
+                            <span id="textoBuscar">?? Buscar</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+
+    @if (Model.Resultados.Any())
+    {
+        <p class="text-muted mb-3">@Model.Resultados.Count mesas encontradas</p>
+
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            @foreach (var mesa in Model.Resultados)
+            {
+                var restaurantImg = GetRestaurantImage(mesa.NombreProveedor);
+                var emoji = GetRestaurantEmoji(mesa.NombreProveedor);
+                var imagenFinal = !string.IsNullOrEmpty(mesa.ImagenUrl) ? mesa.ImagenUrl : restaurantImg;
+                
+                <div class="col">
+                    <div class="card h-100 shadow-sm mesa-card">
+                        <div class="position-relative">
+                            <img src="@imagenFinal" class="card-img-top" alt="Mesa @mesa.NumeroMesa"
+                                 style="height: 200px; object-fit: cover;"
+                                 onerror="this.src='@restaurantImg';">
+                            <span class="position-absolute bottom-0 start-0 m-2 badge bg-danger fs-6">
+                                @emoji @mesa.NombreProveedor
+                            </span>
+                            <span class="position-absolute top-0 end-0 m-2 badge bg-@(mesa.Estado == "Disponible" ? "success" : "warning")">
+                                @mesa.Estado
+                            </span>
+                        </div>
+
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold">Mesa #@mesa.NumeroMesa</h5>
+                            <div class="d-flex gap-2 mb-3">
+                                <span class="badge bg-info text-white">@mesa.TipoMesa</span>
+                                <span class="badge bg-light text-dark border">?? @mesa.Capacidad personas</span>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-end mt-3">
+                                <div>
+                                    <div class="fw-bold text-danger fs-4">
+                                        $@mesa.Precio.ToString("N2")
+                                    </div>
+                                    <small class="text-muted">por reserva</small>
+                                </div>
+                                <a asp-action="Detalle"
+                                   asp-route-servicioId="@mesa.ServicioId"
+                                   asp-route-idMesa="@mesa.IdMesa"
+                                   asp-route-fecha="@Model.Fecha?.ToString("yyyy-MM-dd")"
+                                   asp-route-personas="@Model.NumeroPersonas"
+                                   class="btn btn-danger">
+                                    Reservar ?
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="text-center py-5">
+            <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=300&h=200&fit=crop" 
+                 class="rounded-4 mb-4 shadow" alt="Restaurante">
+            <h4 class="fw-bold"><i class="bi bi-search"></i> Busca mesas disponibles</h4>
+            <p class="text-muted">Selecciona fecha y número de personas</p>
+            <div class="d-flex justify-content-center gap-2 flex-wrap mt-3">
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-cup-straw"></i> Cangrejitos Felices</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-cup-hot"></i> Dragón Rojo</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-cup"></i> Sánctum</span>
+                <span class="badge bg-light text-dark border p-2"><i class="bi bi-tree"></i> Sabor Andino</span>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .mesa-card {
+        border-radius: 16px;
+        border: none;
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+    .mesa-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 35px rgba(0,0,0,.15) !important;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        const btnBuscar = document.getElementById('btnBuscar');
+        const spinner = document.getElementById('spinnerBuscar');
+        const texto = document.getElementById('textoBuscar');
+        if (form) {
+            form.addEventListener('submit', function() {
+                btnBuscar.disabled = true;
+                spinner.classList.remove('d-none');
+                texto.textContent = 'Buscando...';
+            });
+        }
+    });
+</script>

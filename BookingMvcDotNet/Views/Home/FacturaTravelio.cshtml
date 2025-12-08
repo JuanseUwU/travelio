@@ -1,0 +1,255 @@
+@model BookingMvcDotNet.Models.FacturaTravelioViewModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Factura Travelio #@Model.NumeroFactura</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 40px; 
+            background: #f5f5f5;
+            color: #333;
+        }
+        .invoice-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .logo span { font-size: 2.5rem; }
+        .invoice-info {
+            text-align: right;
+        }
+        .invoice-info h2 { font-size: 1.5rem; margin-bottom: 5px; }
+        .invoice-info p { opacity: 0.9; }
+        
+        .content { padding: 30px; }
+        
+        .row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .col { flex: 1; }
+        .col:last-child { text-align: right; }
+        
+        .section-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #888;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        .section-content {
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        .section-content strong { color: #333; }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #666;
+            border-bottom: 2px solid #dee2e6;
+        }
+        th:last-child { text-align: right; }
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+        td:last-child { text-align: right; }
+        .item-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .type-car { background: #e3f2fd; color: #1976d2; }
+        .type-hotel { background: #e8f5e9; color: #388e3c; }
+        .type-flight { background: #fff3e0; color: #f57c00; }
+        
+        .totals {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+        }
+        .total-row {
+            display: flex;
+            justify-content: flex-end;
+            padding: 8px 0;
+        }
+        .total-label { 
+            width: 150px; 
+            text-align: right; 
+            padding-right: 20px;
+            color: #666;
+        }
+        .total-value { 
+            width: 120px; 
+            text-align: right; 
+            font-weight: bold;
+        }
+        .grand-total {
+            font-size: 1.3rem;
+            color: #667eea;
+            border-top: 2px solid #667eea;
+            margin-top: 10px;
+            padding-top: 15px;
+        }
+        
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .footer p { margin: 5px 0; }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .status-paid { background: #d4edda; color: #155724; }
+        
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .print-btn:hover { background: #5a67d8; }
+        
+        @@media print {
+            body { padding: 0; background: white; }
+            .invoice-container { box-shadow: none; }
+            .print-btn { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn" onclick="window.print()">Imprimir</button>
+    
+    <div class="invoice-container">
+        <div class="header">
+            <div class="logo">
+                Travelio
+            </div>
+            <div class="invoice-info">
+                <h2>FACTURA</h2>
+                <p>#@Model.NumeroFactura</p>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="row">
+                <div class="col">
+                    <div class="section-title">Facturado a</div>
+                    <div class="section-content">
+                        <strong>@Model.ClienteNombre</strong><br>
+                        @Model.ClienteTipoDocumento: @Model.ClienteDocumento<br>
+                        @Model.ClienteCorreo
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="section-title">Detalles de Factura</div>
+                    <div class="section-content">
+                        <strong>Fecha:</strong> @Model.FechaEmision.ToString("dd/MM/yyyy")<br>
+                        <strong>Compra:</strong> #@Model.CompraId<br>
+                        <span class="status-badge status-paid">@Model.EstadoPago</span>
+                    </div>
+                </div>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Descripción</th>
+                        <th>Código</th>
+                        <th>Cant.</th>
+                        <th>P. Unit.</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td>
+                                <span class="item-type @(item.Tipo == "CAR" ? "type-car" : item.Tipo == "HOTEL" ? "type-hotel" : "type-flight")">
+                                    @(item.Tipo == "CAR" ? "AUTO" : item.Tipo == "HOTEL" ? "HOTEL" : "VUELO")
+                                </span>
+                                @item.Descripcion
+                            </td>
+                            <td>@item.CodigoReserva</td>
+                            <td>@item.Cantidad</td>
+                            <td>$@item.PrecioUnitario.ToString("N2")</td>
+                            <td>$@item.Total.ToString("N2")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            
+            <div class="totals">
+                <div class="total-row">
+                    <div class="total-label">Subtotal</div>
+                    <div class="total-value">$@Model.Subtotal.ToString("N2")</div>
+                </div>
+                <div class="total-row">
+                    <div class="total-label">IVA (@Model.PorcentajeIVA%)</div>
+                    <div class="total-value">$@Model.IVA.ToString("N2")</div>
+                </div>
+                <div class="total-row grand-total">
+                    <div class="total-label">TOTAL</div>
+                    <div class="total-value">$@Model.Total.ToString("N2")</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Travelio - Tu agencia de viajes integral</strong></p>
+            <p>soporte@travelio.com | +593 99 999 9999</p>
+            <p>Esta factura fue generada electrónicamente y es válida sin firma.</p>
+        </div>
+    </div>
+</body>
+</html>
