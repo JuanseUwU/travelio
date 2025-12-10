@@ -1,5 +1,6 @@
 using System;
 using System.ServiceModel;
+using TravelioREST.Mesas;
 using TravelioSOAP.Mesas.Busqueda;
 using TravelioSOAP.Mesas.Disponibilidad;
 using TravelioSOAP.Mesas.Factura;
@@ -9,14 +10,22 @@ using static TravelioAPIConnector.Global;
 
 namespace TravelioAPIConnector.Mesas;
 
-#pragma warning disable CS0162
 public static class Connector
 {
-    public static async Task<Mesa[]> BuscarMesasAsync(string uri, int? capacidad = null, string? tipoMesa = null, string? estado = null)
+    public static async Task<Mesa[]> BuscarMesasAsync(string uri, int? capacidad = null, string? tipoMesa = null, string? estado = null, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para mesas aun no esta disponible.");
+            var mesasRest = await MesasList.GetMesasListAsync(uri, capacidad, tipoMesa, estado);
+            return Array.ConvertAll(mesasRest, m => new Mesa(
+                m.IdMesa,
+                0,
+                m.NumeroMesa,
+                m.TipoMesa ?? string.Empty,
+                m.Capacidad,
+                m.Precio,
+                m.ImagenURL ?? string.Empty,
+                m.Estado ?? string.Empty));
         }
 
         var soapClient = new BusBusquedaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -34,11 +43,11 @@ public static class Connector
             m.Estado ?? string.Empty));
     }
 
-    public static async Task<bool> ValidarDisponibilidadAsync(string uri, int idMesa, DateTime fecha, int numeroPersonas)
+    public static async Task<bool> ValidarDisponibilidadAsync(string uri, int idMesa, DateTime fecha, int numeroPersonas, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para mesas aun no esta disponible.");
+            return await VerificarDisponibilidadMesas.VerificarAsync(uri, idMesa, numeroPersonas);
         }
 
         var soapClient = new BusDisponibilidadWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -51,11 +60,13 @@ public static class Connector
         int idMesa,
         DateTime fecha,
         int personas,
-        int duracionHoldSegundos = 300)
+        int duracionHoldSegundos = 300,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para mesas aun no esta disponible.");
+            var hold = await MesaHold.CrearMesaHoldAsync(uri, idMesa.ToString(), fecha, personas, duracionHoldSegundos);
+            return (hold.id_hold, DateTime.UtcNow.AddSeconds(duracionHoldSegundos));
         }
 
         var soapClient = new BusReservaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -64,11 +75,12 @@ public static class Connector
         return (pre.IdHold ?? string.Empty, DateTime.TryParse(pre.FechaReserva, out var parsed) ? parsed : DateTime.MinValue);
     }
 
-    public static async Task<int> CrearUsuarioAsync(string uri, string nombre, string apellido, string email, string tipoIdentificacion, string identificacion)
+    public static async Task<int> CrearUsuarioAsync(string uri, string nombre, string apellido, string email, string tipoIdentificacion, string identificacion, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para mesas aun no esta disponible.");
+            var cliente = await RegistroClienteMesas.CrearClienteAsync(uri, nombre, apellido, email, identificacion, tipoIdentificacion);
+            return cliente.id;
         }
 
         var soapClient = new BusUsuarioWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -86,11 +98,25 @@ public static class Connector
         string tipoIdentificacion,
         string identificacion,
         DateTime fecha,
-        int personas)
+        int personas,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para mesas aun no esta disponible.");
+            var reserva = await MesaReserva.CrearMesaReservaAsync(uri, idMesa.ToString(), holdId, nombre, apellido, correo, identificacion, fecha, personas, tipoIdentificacion);
+            return new Reserva(
+                reserva.mensaje ?? string.Empty,
+                reserva.idReserva ?? string.Empty,
+                idMesa,
+                fecha,
+                personas,
+                string.Empty,
+                string.Empty,
+                nombre,
+                apellido,
+                correo,
+                reserva.valor_pagado,
+                reserva.uri_factura ?? string.Empty);
         }
 
         var soapClient = new BusReservaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -105,47 +131,60 @@ public static class Connector
             fecha.ToString(),
             personas);
 
-        var reserva = response?.ConfirmarReservaResult ?? throw new InvalidOperationException("No se pudo confirmar la reserva.");
+        var reservaSoap = response?.ConfirmarReservaResult ?? throw new InvalidOperationException("No se pudo confirmar la reserva.");
 
         return new Reserva(
-            reserva.Mensaje ?? string.Empty,
-            reserva.IdReserva ?? string.Empty,
-            reserva.IdMesa,
-            DateTime.TryParse(reserva.FechaReserva, out var fechaReserva) ? fechaReserva : DateTime.MinValue,
-            reserva.NumeroPersonas,
+            reservaSoap.Mensaje ?? string.Empty,
+            reservaSoap.IdReserva ?? string.Empty,
+            reservaSoap.IdMesa,
+            DateTime.TryParse(reservaSoap.FechaReserva, out var fechaReserva) ? fechaReserva : DateTime.MinValue,
+            reservaSoap.NumeroPersonas,
             string.Empty,
             string.Empty,
-            reserva.NombreCliente ?? string.Empty,
-            reserva.ApellidoCliente ?? string.Empty,
-            reserva.Correo ?? string.Empty,
-            reserva.ValorPagado,
-            reserva.UriFactura ?? string.Empty);
+            reservaSoap.NombreCliente ?? string.Empty,
+            reservaSoap.ApellidoCliente ?? string.Empty,
+            reservaSoap.Correo ?? string.Empty,
+            reservaSoap.ValorPagado,
+            reservaSoap.UriFactura ?? string.Empty);
     }
 
-    public static async Task<Reserva> BuscarReservaAsync(string uri, int idReserva)
+    public static async Task<Reserva> BuscarReservaAsync(string uri, int idReserva, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para mesas aun no esta disponible.");
+            var datos = await MesaReservaConsulta.ConsultarMesaReservaAsync(uri, idReserva.ToString());
+            return new Reserva(
+                string.Empty,
+                idReserva.ToString(),
+                int.TryParse(datos.numero_mesa, out var idMesa) ? idMesa : 0,
+                datos.fecha,
+                datos.numero_personas,
+                string.Empty,
+                datos.tipo ?? string.Empty,
+                datos.nombre ?? string.Empty,
+                datos.apellido ?? string.Empty,
+                datos.correo ?? string.Empty,
+                datos.valor_pagado,
+                datos.uri_factura ?? string.Empty);
         }
 
         var soapClient = new BusReservaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
         var response = await soapClient.BuscarReservaAsync(idReserva.ToString());
-        var datos = response?.BuscarReservaResult ?? throw new InvalidOperationException("No se pudieron obtener los datos de la reserva.");
+        var datosSoap = response?.BuscarReservaResult ?? throw new InvalidOperationException("No se pudieron obtener los datos de la reserva.");
 
         return new Reserva(
-            datos.Mensaje ?? string.Empty,
-            datos.IdReserva.ToString(),
-            datos.IdMesa,
-            datos.Fecha,
-            datos.NumeroPersonas,
-            datos.Estado ?? string.Empty,
-            datos.TipoMesa ?? string.Empty,
-            datos.NombreCliente ?? string.Empty,
-            datos.ApellidoCliente ?? string.Empty,
-            datos.Correo ?? string.Empty,
-            datos.ValorPagado,
-            datos.UriFactura ?? string.Empty);
+            datosSoap.Mensaje ?? string.Empty,
+            datosSoap.IdReserva.ToString(),
+            datosSoap.IdMesa,
+            datosSoap.Fecha,
+            datosSoap.NumeroPersonas,
+            datosSoap.Estado ?? string.Empty,
+            datosSoap.TipoMesa ?? string.Empty,
+            datosSoap.NombreCliente ?? string.Empty,
+            datosSoap.ApellidoCliente ?? string.Empty,
+            datosSoap.Correo ?? string.Empty,
+            datosSoap.ValorPagado,
+            datosSoap.UriFactura ?? string.Empty);
     }
 
     public static async Task<string> GenerarFacturaAsync(
@@ -155,16 +194,23 @@ public static class Connector
         string nombre,
         string tipoIdentificacion,
         string identificacion,
-        decimal valor)
+        decimal valor,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para mesas aun no esta disponible.");
+            var factura = await MesaFactura.CrearMesaFacturaAsync(uri, idReserva, correo, nombre, identificacion, valor, tipoIdentificacion);
+            return factura.uri_factura ?? throw new InvalidOperationException("No se pudo generar la factura.");
         }
 
         var soapClient = new BusFacturaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
-        var factura = await soapClient.GenerarFacturaBusAsync(idReserva, correo, nombre, tipoIdentificacion, identificacion, valor);
-        return factura?.uri_factura ?? throw new InvalidOperationException("No se pudo generar la factura.");
+        var facturaSoap = await soapClient.GenerarFacturaBusAsync(idReserva, correo, nombre, tipoIdentificacion, identificacion, valor);
+        return facturaSoap?.uri_factura ?? throw new InvalidOperationException("No se pudo generar la factura.");
+    }
+
+    public static async Task<(bool exito, decimal valorPagado)> CancelarReservaAsync(string uri, string idReserva)
+    {
+        var cancelar = await MesaCancelarReserva.CancelarMesaReservaAsync(uri, idReserva);
+        return (cancelar.exito, cancelar.valor_pagado);
     }
 }
-#pragma warning restore CS0162

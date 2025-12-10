@@ -16,4 +16,5 @@ public class DetalleServicio
     public string? CrearReservaEndpoint { get; set; }
     public string? GenerarFacturaEndpoint { get; set; }
     public string? ObtenerReservaEndpoint { get; set; }
+    public string? CancelarReservaEndpoint { get; set; }
 }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TravelioDatabaseConnector.Data;
 
@@ -11,9 +12,11 @@ using TravelioDatabaseConnector.Data;
 namespace TravelioDatabaseConnector.Migrations
 {
     [DbContext(typeof(TravelioDbContext))]
-    partial class TravelioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251210062530_AddRolesAndCancelSupport")]
+    partial class AddRolesAndCancelSupport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

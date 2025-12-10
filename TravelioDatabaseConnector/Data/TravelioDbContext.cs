@@ -58,6 +58,11 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
             builder.Property(c => c.DocumentoIdentidad).IsRequired().HasMaxLength(120);
             builder.Property(c => c.PasswordHash).IsRequired().HasMaxLength(256);
             builder.Property(c => c.PasswordSalt).IsRequired().HasMaxLength(256);
+            builder.Property(c => c.Rol)
+                .HasConversion<string>()
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue(RolUsuario.Cliente);
         });
     }
 
@@ -83,6 +88,11 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
             builder.HasKey(r => r.Id);
             builder.Property(r => r.CodigoReserva).IsRequired().HasMaxLength(120);
             builder.Property(r => r.FacturaUrl).HasMaxLength(1024);
+            builder.Property(r => r.Activa)
+                .IsRequired()
+                .HasDefaultValue(true);
+            builder.Property(r => r.ValorPagadoNegocio).HasPrecision(18, 2);
+            builder.Property(r => r.ComisionAgencia).HasPrecision(18, 2);
             builder.HasOne(r => r.Servicio)
                 .WithMany(s => s.Reservas)
                 .HasForeignKey(r => r.ServicioId)
@@ -132,6 +142,7 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
             builder.Property(d => d.CrearReservaEndpoint).HasMaxLength(512);
             builder.Property(d => d.GenerarFacturaEndpoint).HasMaxLength(512);
             builder.Property(d => d.ObtenerReservaEndpoint).HasMaxLength(512);
+            builder.Property(d => d.CancelarReservaEndpoint).HasMaxLength(512);
             builder.Property(d => d.TipoProtocolo)
                 .HasConversion<string>()
                 .IsRequired()
@@ -1590,6 +1601,13 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 ObtenerReservaEndpoint = "/reservas"
             },
         };
+
+        foreach (var detalle in detalles)
+        {
+            detalle.CancelarReservaEndpoint = detalle.TipoProtocolo == TipoProtocolo.Rest
+                ? "/cancel"
+                : null;
+        }
 
         modelBuilder.Entity<DetalleServicio>().HasData(detalles);
     }

@@ -26,9 +26,10 @@ public static class Connector
         decimal? precioMax = null,
         string? sort = null,
         string? ciudad = null,
-        string? pais = null)
+        string? pais = null,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             var uriBuilder = new UriBuilder(uri);
 
@@ -109,9 +110,9 @@ public static class Connector
         }
     }
 
-    public static async Task<bool> VerificarDisponibilidadAutoAsync(string uri, string idAuto, DateTime dateFrom, DateTime dateTo)
+    public static async Task<bool> VerificarDisponibilidadAutoAsync(string uri, string idAuto, DateTime dateFrom, DateTime dateTo, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             return await VehicleCheckAvailable.GetDisponibilidadAsync(uri, idAuto, dateFrom, dateTo);
         }
@@ -127,9 +128,10 @@ public static class Connector
         string idAuto,
         DateTime dateFrom,
         DateTime dateTo,
-        int duracionHold = 300)
+        int duracionHold = 300,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             // Modificado en V2 (¡¿POR QUÉ?!)
             var uriBuilder = new UriBuilder(uri);
@@ -164,11 +166,11 @@ public static class Connector
         }
     }
 
-    public static async Task<int> CrearClienteExternoAsync(string uri, string nombre, string apellido, string correo)
+    public static async Task<int> CrearClienteExternoAsync(string uri, string nombre, string apellido, string correo, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            var response = await ExternalClientCreator.CrearClienteExternoAsync(uri, null, nombre, apellido, correo, null, null);
+            var response = await ExternalClientCreator.CrearClienteExternoAsync(uri, nombre, apellido, correo, null, null);
             return response.IdUsuario;
         }
         else
@@ -196,9 +198,10 @@ public static class Connector
         string identificacion,
         string correo,
         DateTime fechaInicio,
-        DateTime fechaFin)
+        DateTime fechaFin,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             var response = await AutosReservaCreador.CrearReservaAsync(uri, idAuto, idHold, nombre, apellido, tipoIdentificacion, identificacion, correo, fechaInicio, fechaFin);
             return response.datos.id_reserva;
@@ -216,9 +219,10 @@ public static class Connector
         decimal subtotal,
         decimal iva,
         decimal total,
-        (string nombre, string tipoDocumento, string documento, string correo) cliente)
+        (string nombre, string tipoDocumento, string documento, string correo) cliente,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             return await InvoiceGenerator.GenerarFacturaAsync(uri, reservaId, subtotal, iva, total, cliente.nombre, cliente.tipoDocumento, cliente.documento, cliente.correo);
         }
@@ -231,12 +235,11 @@ public static class Connector
         }
     }
 
-    public static async Task<Reserva> ObtenerDatosReservaAsync(string uri, int reservaId)
+    public static async Task<Reserva> ObtenerDatosReservaAsync(string uri, int reservaId, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            uri = uri.EndsWith('/') ? $"{uri}{reservaId}" : $"{uri}/{reservaId}";
-            var datos = await AutosReservaObtenerDatos.GetReservaAsync(uri);
+            var datos = await AutosReservaObtenerDatos.GetReservaAsync(uri, reservaId);
             return new Reserva
             {
                 NumeroMatricula = datos.numero_matricula,
@@ -267,5 +270,11 @@ public static class Connector
                 UriFactura = datos.uri_factura
             };
         }
+    }
+
+    public static async Task<(bool exito, decimal valorPagado)> CancelarReservaAsync(string uri, string idReserva)
+    {
+        var resultado = await CancelarReservaAutos.CancelarReservaAsync(uri, idReserva);
+        return (resultado.Exito, resultado.ValorPagado);
     }
 }

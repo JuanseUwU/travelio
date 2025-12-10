@@ -1,11 +1,12 @@
 using System;
+using System.Linq;
 using System.ServiceModel;
+using TravelioREST.Paquetes;
 using TravelioSOAP.Paquetes;
 using static TravelioAPIConnector.Global;
 
 namespace TravelioAPIConnector.Paquetes;
 
-#pragma warning disable CS0162
 public static class Connector
 {
     public static async Task<Paquete[]> BuscarPaquetesAsync(
@@ -13,18 +14,44 @@ public static class Connector
         string? ciudad = null,
         DateTime? fechaInicio = null,
         string? tipoActividad = null,
-        decimal? precioMax = null)
+        decimal? precioMax = null,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para paquetes aun no esta disponible.");
+            var response = await PaquetesList.ObtenerPaquetesAsync(
+                uri,
+                ciudad,
+                null,
+                fechaInicio,
+                null,
+                tipoActividad,
+                null,
+                null,
+                precioMax,
+                null,
+                null,
+                null);
+
+            var paquetes = response.datos ?? Array.Empty<DatoPaquetes>();
+            return paquetes.Select(dto => new Paquete(
+                dto.idPaquete ?? string.Empty,
+                dto.nombre ?? string.Empty,
+                dto.ciudad ?? string.Empty,
+                dto.pais ?? string.Empty,
+                dto.tipoActividad ?? string.Empty,
+                dto.capacidad,
+                dto.precioNormal,
+                dto.precioActual,
+                dto.imagenUrl ?? string.Empty,
+                dto.duracion)).ToArray();
         }
 
         var soapClient = new PaquetesServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
-        var response = await soapClient.BuscarPaquetesAsync(ciudad, fechaInicio?.ToString("yyyy-MM-dd"), tipoActividad, precioMax);
-        var paquetes = response?.BuscarPaquetesResult ?? [];
+        var responseSoap = await soapClient.BuscarPaquetesAsync(ciudad, fechaInicio?.ToString("yyyy-MM-dd"), tipoActividad, precioMax);
+        var paquetesSoap = responseSoap?.BuscarPaquetesResult ?? [];
 
-        return Array.ConvertAll(paquetes, dto => new Paquete(
+        return Array.ConvertAll(paquetesSoap, dto => new Paquete(
             dto.IdPaquete ?? string.Empty,
             dto.Nombre ?? string.Empty,
             dto.Ciudad ?? string.Empty,
@@ -37,11 +64,11 @@ public static class Connector
             dto.Duracion ?? 0));
     }
 
-    public static async Task<bool> ValidarDisponibilidadAsync(string uri, string idPaquete, DateTime fechaInicio, int personas)
+    public static async Task<bool> ValidarDisponibilidadAsync(string uri, string idPaquete, DateTime fechaInicio, int personas, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para paquetes aun no esta disponible.");
+            return await VerificarDisponibilidadPaquetes.VerificarDisponibilidadAsync(uri, idPaquete, fechaInicio, personas);
         }
 
         var soapClient = new PaquetesServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -54,11 +81,32 @@ public static class Connector
         string bookingUserId,
         DateTime fechaInicio,
         int personas,
-        int duracionSegundos = 300)
+        int duracionSegundos = 300,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para paquetes aun no esta disponible.");
+            var turistasHold = Enumerable.Range(1, Math.Max(1, personas)).Select(i => new TuristaHold
+            {
+                nombre = $"Turista{i}",
+                apellido = $"Paquete{i}",
+                fechaNacimiento = DateTime.UtcNow.Date,
+                tipoIdentificacion = "Documento",
+                identificacion = $"{bookingUserId}-{i}"
+            }).ToArray();
+
+            var holdRequest = new HoldRequest
+            {
+                idPaquete = idPaquete,
+                bookingUserId = bookingUserId,
+                correo = $"cliente-{bookingUserId}@travelio.local",
+                fechaInicio = fechaInicio,
+                turistas = turistasHold,
+                duracionHoldSegundos = duracionSegundos
+            };
+
+            var hold = await PreReservaPaquetes.CrearPreReservaAsync(uri, holdRequest);
+            return (hold.id_hold, hold.fechaExpiracion);
         }
 
         var soapClient = new PaquetesServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -66,11 +114,12 @@ public static class Connector
         return (response.HoldId, response.Expira);
     }
 
-    public static async Task<string> CrearUsuarioExternoAsync(string uri, string bookingUserId, string nombre, string apellido, string correo)
+    public static async Task<string> CrearUsuarioExternoAsync(string uri, string bookingUserId, string nombre, string apellido, string correo, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para paquetes aun no esta disponible.");
+            var usuario = await CrearUsuarioPaquetes.CrearUsuarioAsync(uri, correo, nombre, apellido);
+            return usuario.idUsuario ?? string.Empty;
         }
 
         var soapClient = new PaquetesServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -84,11 +133,36 @@ public static class Connector
         string holdId,
         string bookingUserId,
         string metodoPago,
-        (string nombre, string apellido, DateTime? fechaNacimiento, string tipoIdentificacion, string identificacion)[] turistas)
+        (string nombre, string apellido, DateTime? fechaNacimiento, string tipoIdentificacion, string identificacion)[] turistas,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para paquetes aun no esta disponible.");
+            var reservaRequest = new ReservaRequest
+            {
+                idPaquete = idPaquete,
+                idHold = holdId,
+                correo = $"reserva-{bookingUserId}@travelio.local",
+                metodoPago = metodoPago,
+                turistas = turistas.Select(t => new TuristaReserva
+                {
+                    nombre = t.nombre,
+                    apellido = t.apellido,
+                    fechaNacimiento = t.fechaNacimiento ?? DateTime.UtcNow.Date,
+                    tipoIdentificacion = t.tipoIdentificacion,
+                    identificacion = t.identificacion
+                }).ToArray()
+            };
+
+            var reservaRest = await ReservaPaquetes.CrearReservaAsync(uri, reservaRequest);
+            return new Reserva(
+                reservaRest.id_reserva ?? string.Empty,
+                reservaRest.id_reserva ?? string.Empty,
+                0,
+                0,
+                0m,
+                DateTime.UtcNow,
+                reservaRest.payment_status ?? string.Empty);
         }
 
         var soapClient = new PaquetesServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -116,16 +190,32 @@ public static class Connector
                 reserva.Estado ?? string.Empty);
     }
 
-    public static async Task<string> EmitirFacturaAsync(string uri, string reservaId, decimal subtotal, decimal iva, decimal total)
+    public static async Task<string> EmitirFacturaAsync(string uri, string reservaId, decimal subtotal, decimal iva, decimal total, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
-            throw new NotImplementedException("La integracion REST para paquetes aun no esta disponible.");
+            var facturaRequest = new FacturaRequest
+            {
+                idReserva = reservaId,
+                correo = "factura@travelio.local",
+                nombre = "Cliente Travelio",
+                tipoIdentificacion = "NA",
+                identificacion = "NA",
+                valor = total
+            };
+
+            var factura = await FacturaPaquetes.GenerarFacturaAsync(uri, facturaRequest);
+            return factura.uriFactura ?? throw new InvalidOperationException("No se pudo emitir la factura del paquete (REST).");
         }
 
         var soapClient = new PaquetesServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
-        var factura = await soapClient.EmitirFacturaAsync(reservaId, subtotal, iva, total);
-        return factura?.UriFactura ?? throw new InvalidOperationException("No se pudo emitir la factura del paquete.");
+        var facturaSoap = await soapClient.EmitirFacturaAsync(reservaId, subtotal, iva, total);
+        return facturaSoap?.UriFactura ?? throw new InvalidOperationException("No se pudo emitir la factura del paquete.");
+    }
+
+    public static async Task<(bool exito, decimal valorDevuelto)> CancelarReservaAsync(string uri, string idReserva)
+    {
+        var cancelacion = await CancelarReservaPaquetes.CancelarReservaAsync(uri, idReserva);
+        return (cancelacion.exito, cancelacion.valor_pasado);
     }
 }
-#pragma warning restore CS0162

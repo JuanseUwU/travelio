@@ -1,3 +1,4 @@
+using TravelioDatabaseConnector.Enums;
 using TravelioDatabaseConnector.Models.Carrito;
 
 namespace TravelioDatabaseConnector.Models;
@@ -15,6 +16,7 @@ public class Cliente
     public string DocumentoIdentidad { get; set; } = default!;
     public string PasswordHash { get; set; } = default!;
     public string PasswordSalt { get; set; } = default!;
+    public RolUsuario Rol { get; set; } = RolUsuario.Cliente;
 
     public ICollection<Compra> Compras { get; set; } = new List<Compra>();
     public ICollection<CarritoAerolineaItem> CarritoAerolineaItems { get; set; } = new List<CarritoAerolineaItem>();
