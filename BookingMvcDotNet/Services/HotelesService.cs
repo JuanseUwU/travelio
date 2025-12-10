@@ -7,13 +7,11 @@ using TravelioAPIConnector.Habitaciones;
 namespace BookingMvcDotNet.Services;
 
 /// <summary>
-/// Implementación del servicio de hoteles que usa TravelioAPIConnector para SOAP/REST.
+/// Implementacion del servicio de hoteles que usa TravelioAPIConnector para REST/SOAP.
+/// Prioriza REST y usa SOAP como fallback. Cancelacion solo disponible en REST.
 /// </summary>
 public class HotelesService(TravelioDbContext dbContext, ILogger<HotelesService> logger) : IHotelesService
 {
-    /// <summary>
-    /// Completa una URL de imagen relativa con la URL base del proveedor.
-    /// </summary>
     private static string CompletarUrlImagen(string? uriImagen, string uriBase)
     {
         if (string.IsNullOrEmpty(uriImagen))
@@ -60,7 +58,6 @@ public class HotelesService(TravelioDbContext dbContext, ILogger<HotelesService>
 
         try
         {
-            // Obtener todos los servicios de hoteles activos
             var servicios = await dbContext.Servicios
                 .Where(s => s.TipoServicio == TipoServicio.Hotel && s.Activo)
                 .ToListAsync();
@@ -76,42 +73,56 @@ public class HotelesService(TravelioDbContext dbContext, ILogger<HotelesService>
             {
                 try
                 {
-                    var detalle = detalles
-                        .Where(d => d.ServicioId == servicio.Id && d.TipoProtocolo == TipoProtocolo.Soap)
-                        .FirstOrDefault();
+                    var detalleRest = detalles.FirstOrDefault(d => d.ServicioId == servicio.Id && d.TipoProtocolo == TipoProtocolo.Rest);
+                    var detalleSoap = detalles.FirstOrDefault(d => d.ServicioId == servicio.Id && d.TipoProtocolo == TipoProtocolo.Soap);
 
-                    if (detalle == null) continue;
+                    Habitacion[] habitaciones = [];
+                    string uriBaseUsada = "";
+                    bool usandoRest = false;
 
-                    var uri = $"{detalle.UriBase}{detalle.ObtenerProductosEndpoint}";
+                    // Intentar REST primero
+                    if (detalleRest != null)
+                    {
+                        try
+                        {
+                            var uriRest = $"{detalleRest.UriBase}{detalleRest.ObtenerProductosEndpoint}";
+                            logger.LogInformation("Consultando {Servicio} (REST): {Uri}", servicio.Nombre, uriRest);
 
-                    logger.LogInformation("Consultando {Servicio} (SOAP): {Uri}", servicio.Nombre, uri);
+                            habitaciones = await Connector.BuscarHabitacionesAsync(
+                                uriRest, filtros.FechaInicio, filtros.FechaFin, filtros.TipoHabitacion,
+                                filtros.Capacidad, filtros.PrecioMin, filtros.PrecioMax);
+                            uriBaseUsada = detalleRest.UriBase;
+                            usandoRest = true;
+                        }
+                        catch (Exception exRest)
+                        {
+                            logger.LogWarning(exRest, "REST fallo para {Servicio}, intentando SOAP", servicio.Nombre);
+                        }
+                    }
 
-                    var habitaciones = await Connector.BuscarHabitacionesAsync(
-                        uri,
-                        filtros.FechaInicio,
-                        filtros.FechaFin,
-                        filtros.TipoHabitacion,
-                        filtros.Capacidad,
-                        filtros.PrecioMin,
-                        filtros.PrecioMax
-                    );
+                    // Fallback a SOAP si REST fallo o no existe
+                    if (!usandoRest && detalleSoap != null)
+                    {
+                        var uriSoap = $"{detalleSoap.UriBase}{detalleSoap.ObtenerProductosEndpoint}";
+                        logger.LogInformation("Consultando {Servicio} (SOAP): {Uri}", servicio.Nombre, uriSoap);
+
+                        habitaciones = await Connector.BuscarHabitacionesAsync(
+                            uriSoap, filtros.FechaInicio, filtros.FechaFin, filtros.TipoHabitacion,
+                            filtros.Capacidad, filtros.PrecioMin, filtros.PrecioMax, forceSoap: true);
+                        uriBaseUsada = detalleSoap.UriBase;
+                    }
 
                     foreach (var h in habitaciones)
                     {
-                        // Filtrar por ciudad si se especificó
                         if (!string.IsNullOrEmpty(filtros.Ciudad) && 
                             !h.Ciudad.Contains(filtros.Ciudad, StringComparison.OrdinalIgnoreCase))
                             continue;
 
-                        // Procesar imágenes: filtrar vacías y completar URLs
                         var imagenesCompletas = h.Imagenes
                             .Where(img => !string.IsNullOrWhiteSpace(img))
-                            .Select(img => CompletarUrlImagen(img.Trim(), detalle.UriBase))
+                            .Select(img => CompletarUrlImagen(img.Trim(), uriBaseUsada))
                             .Where(img => !string.IsNullOrEmpty(img))
                             .ToArray();
-
-                        logger.LogInformation("Habitación {Id} de {Hotel}: {NumImagenes} imágenes, Primera='{Imagen}'",
-                            h.IdHabitacion, h.Hotel, imagenesCompletas.Length, imagenesCompletas.FirstOrDefault() ?? "ninguna");
 
                         todasLasHabitaciones.Add(new HabitacionViewModel
                         {
@@ -131,8 +142,8 @@ public class HotelesService(TravelioDbContext dbContext, ILogger<HotelesService>
                         });
                     }
 
-                    logger.LogInformation("Encontradas {Count} habitaciones en {Servicio}",
-                        habitaciones.Length, servicio.Nombre);
+                    logger.LogInformation("Encontradas {Count} habitaciones en {Servicio} ({Protocolo})",
+                        habitaciones.Length, servicio.Nombre, usandoRest ? "REST" : "SOAP");
                 }
                 catch (Exception ex)
                 {
@@ -144,7 +155,7 @@ public class HotelesService(TravelioDbContext dbContext, ILogger<HotelesService>
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error en búsqueda de habitaciones");
+            logger.LogError(ex, "Error en busqueda de habitaciones");
             resultado.ErrorMessage = "Error al buscar habitaciones. Intente nuevamente.";
         }
 
@@ -158,22 +169,40 @@ public class HotelesService(TravelioDbContext dbContext, ILogger<HotelesService>
             var servicio = await dbContext.Servicios.FirstOrDefaultAsync(s => s.Id == servicioId);
             if (servicio == null) return null;
 
-            var detalle = await dbContext.DetallesServicio
-                .Where(d => d.ServicioId == servicioId && d.TipoProtocolo == TipoProtocolo.Soap)
-                .FirstOrDefaultAsync();
+            var detalles = await dbContext.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
 
-            if (detalle == null) return null;
+            var detalleRest = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest);
+            var detalleSoap = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Soap);
 
-            var uri = $"{detalle.UriBase}{detalle.ObtenerProductosEndpoint}";
+            Habitacion[] habitaciones = [];
+            string uriBaseUsada = "";
 
-            var habitaciones = await Connector.BuscarHabitacionesAsync(uri);
+            if (detalleRest != null)
+            {
+                try
+                {
+                    var uri = $"{detalleRest.UriBase}{detalleRest.ObtenerProductosEndpoint}";
+                    habitaciones = await Connector.BuscarHabitacionesAsync(uri);
+                    uriBaseUsada = detalleRest.UriBase;
+                }
+                catch { /* Fallback a SOAP */ }
+            }
+
+            if (habitaciones.Length == 0 && detalleSoap != null)
+            {
+                var uri = $"{detalleSoap.UriBase}{detalleSoap.ObtenerProductosEndpoint}";
+                habitaciones = await Connector.BuscarHabitacionesAsync(uri, forceSoap: true);
+                uriBaseUsada = detalleSoap.UriBase;
+            }
+
             var habitacion = habitaciones.FirstOrDefault(h => h.IdHabitacion == idHabitacion);
-
             if (string.IsNullOrEmpty(habitacion.IdHabitacion)) return null;
 
             var imagenesCompletas = habitacion.Imagenes
                 .Where(img => !string.IsNullOrWhiteSpace(img))
-                .Select(img => CompletarUrlImagen(img.Trim(), detalle.UriBase))
+                .Select(img => CompletarUrlImagen(img.Trim(), uriBaseUsada))
                 .Where(img => !string.IsNullOrEmpty(img))
                 .ToArray();
 
@@ -196,7 +225,7 @@ public class HotelesService(TravelioDbContext dbContext, ILogger<HotelesService>
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error obteniendo habitación {IdHabitacion}", idHabitacion);
+            logger.LogError(ex, "Error obteniendo habitacion {IdHabitacion}", idHabitacion);
             return null;
         }
     }
@@ -205,15 +234,30 @@ public class HotelesService(TravelioDbContext dbContext, ILogger<HotelesService>
     {
         try
         {
-            var detalle = await dbContext.DetallesServicio
-                .Where(d => d.ServicioId == servicioId && d.TipoProtocolo == TipoProtocolo.Soap)
-                .FirstOrDefaultAsync();
+            var detalles = await dbContext.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
 
-            if (detalle == null) return false;
+            var detalleRest = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest);
+            var detalleSoap = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Soap);
 
-            var uri = $"{detalle.UriBase}{detalle.ConfirmarProductoEndpoint}";
+            if (detalleRest != null)
+            {
+                try
+                {
+                    var uri = $"{detalleRest.UriBase}{detalleRest.ConfirmarProductoEndpoint}";
+                    return await Connector.ValidarDisponibilidadAsync(uri, idHabitacion, fechaInicio, fechaFin);
+                }
+                catch { /* Fallback a SOAP */ }
+            }
 
-            return await Connector.ValidarDisponibilidadAsync(uri, idHabitacion, fechaInicio, fechaFin);
+            if (detalleSoap != null)
+            {
+                var uri = $"{detalleSoap.UriBase}{detalleSoap.ConfirmarProductoEndpoint}";
+                return await Connector.ValidarDisponibilidadAsync(uri, idHabitacion, fechaInicio, fechaFin, forceSoap: true);
+            }
+
+            return false;
         }
         catch (Exception ex)
         {
@@ -232,26 +276,32 @@ public class HotelesService(TravelioDbContext dbContext, ILogger<HotelesService>
     {
         try
         {
-            var detalle = await dbContext.DetallesServicio
-                .Where(d => d.ServicioId == servicioId && d.TipoProtocolo == TipoProtocolo.Soap)
-                .FirstOrDefaultAsync();
+            var detalles = await dbContext.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
 
-            if (detalle == null)
-                return (false, "Servicio no encontrado", null);
+            var detalleRest = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest);
+            var detalleSoap = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Soap);
 
-            var uri = $"{detalle.UriBase}{detalle.CrearPrerreservaEndpoint}";
+            if (detalleRest != null)
+            {
+                try
+                {
+                    var uri = $"{detalleRest.UriBase}{detalleRest.CrearPrerreservaEndpoint}";
+                    var holdId = await Connector.CrearPrerreservaAsync(uri, idHabitacion, fechaInicio, fechaFin, numeroHuespedes, 300, precioActual);
+                    return (true, $"Prerreserva creada (REST): {holdId}", holdId);
+                }
+                catch { /* Fallback a SOAP */ }
+            }
 
-            var holdId = await Connector.CrearPrerreservaAsync(
-                uri, 
-                idHabitacion, 
-                fechaInicio, 
-                fechaFin, 
-                numeroHuespedes,
-                300, // 5 minutos de hold
-                precioActual
-            );
+            if (detalleSoap != null)
+            {
+                var uri = $"{detalleSoap.UriBase}{detalleSoap.CrearPrerreservaEndpoint}";
+                var holdId = await Connector.CrearPrerreservaAsync(uri, idHabitacion, fechaInicio, fechaFin, numeroHuespedes, 300, precioActual, forceSoap: true);
+                return (true, $"Prerreserva creada (SOAP): {holdId}", holdId);
+            }
 
-            return (true, $"Prerreserva creada: {holdId}", holdId);
+            return (false, "Servicio no encontrado", null);
         }
         catch (Exception ex)
         {

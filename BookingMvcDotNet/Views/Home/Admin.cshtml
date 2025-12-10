@@ -1,264 +1,640 @@
-﻿@using System.Linq
-@using System.Collections.Generic
-@model List<BookingMvcDotNet.Models.UserViewModel>
-
+@model BookingMvcDotNet.Models.AdminDashboardViewModel
 @{
-    ViewData["Title"] = "Administración";
-
-    // Configuración traída desde el controlador vía ViewBag (con valores por defecto)
-    int ivaPercent = ViewBag.IvaPercent is int iv ? iv : 0;
-    int promoDiscount = ViewBag.PromoDiscount is int pd ? pd : 0;
-    IEnumerable<string> activeCats =
-        ViewBag.PromoCategories as IEnumerable<string> ?? Enumerable.Empty<string>();
+    ViewData["Title"] = "Panel de Administracion";
+    Layout = "_Layout";
 }
 
-<div class="container mt-4">
-    <h2 class="mb-4">Panel de Administración</h2>
+@section Styles {
+<style>
+    .admin-header {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+    }
+    .stat-card {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    .stat-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+    .nav-pills-admin .nav-link {
+        border-radius: 10px;
+        padding: 12px 20px;
+        font-weight: 500;
+        color: #495057;
+        transition: all 0.2s;
+    }
+    .nav-pills-admin .nav-link.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    .nav-pills-admin .nav-link:not(.active):hover {
+        background: #f8f9fa;
+    }
+    .table-admin th {
+        background: #f8f9fa;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+    }
+    .badge-rest { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+    .badge-soap { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .badge-activa { background: #28a745; }
+    .badge-cancelada { background: #dc3545; }
+    .provider-card {
+        border-radius: 12px;
+        border: 1px solid #e9ecef;
+        transition: all 0.2s;
+    }
+    .provider-card:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+    }
+    .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .status-online { background: #28a745; }
+    .status-offline { background: #dc3545; }
+    .status-unknown { background: #ffc107; }
+</style>
+}
 
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-white">
-            <ul class="nav nav-tabs card-header-tabs" id="adminTabs" role="tablist">
-                <li class="nav-item">
-                    <button class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button">
-                        Configuración
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button">
-                        Usuarios
-                    </button>
-                </li>
-            </ul>
+<!-- Header -->
+<div class="admin-header">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-1"><i class="bi bi-shield-lock"></i> Panel de Administracion</h1>
+                <p class="mb-0 opacity-75">Bienvenido, Administrador</p>
+            </div>
+            <a asp-action="Logout" class="btn btn-outline-light">
+                <i class="bi bi-box-arrow-right"></i> Cerrar Sesion
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Estadisticas -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="card stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Total Clientes</div>
+                        <div class="fs-3 fw-bold">@Model.TotalClientes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="stat-icon bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-cart-check"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Total Compras</div>
+                        <div class="fs-3 fw-bold">@Model.TotalCompras</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="stat-icon bg-info bg-opacity-10 text-info">
+                        <i class="bi bi-bookmark-check"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Reservas Activas</div>
+                        <div class="fs-3 fw-bold text-success">@Model.ReservasActivas</div>
+                        <small class="text-danger">@Model.ReservasCanceladas canceladas</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card stat-card h-100">
+                <div class="card-body d-flex align-items-center gap-3">
+                    <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                        <i class="bi bi-cash-stack"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Ingresos Totales</div>
+                        <div class="fs-3 fw-bold">$@Model.IngresosTotales.ToString("N2")</div>
+                        <small class="text-success">Hoy: $@Model.IngresosHoy.ToString("N2")</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-pills nav-pills-admin mb-4" id="adminTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-dashboard">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-clientes">
+                <i class="bi bi-people"></i> Clientes (@Model.TotalClientes)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-compras">
+                <i class="bi bi-receipt"></i> Compras (@Model.TotalCompras)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-reservas">
+                <i class="bi bi-bookmark"></i> Reservas (@Model.TotalReservas)
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-proveedores">
+                <i class="bi bi-hdd-network"></i> Proveedores (@Model.EstadoProveedores.Count)
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- Dashboard -->
+        <div class="tab-pane fade show active" id="tab-dashboard">
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h5 class="mb-0"><i class="bi bi-clock-history text-primary"></i> Ultimas Compras</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-admin">
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Cliente</th>
+                                            <th>Fecha</th>
+                                            <th>Reservas</th>
+                                            <th class="text-end">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var compra in Model.UltimasCompras.Take(10))
+                                        {
+                                            <tr>
+                                                <td><span class="badge bg-light text-dark">#@compra.Id</span></td>
+                                                <td>
+                                                    <div class="fw-semibold">@compra.ClienteNombre</div>
+                                                    <small class="text-muted">@compra.ClienteEmail</small>
+                                                </td>
+                                                <td>@compra.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                                <td><span class="badge bg-info">@compra.CantidadReservas</span></td>
+                                                <td class="text-end fw-bold text-success">$@compra.Total.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h5 class="mb-0"><i class="bi bi-pie-chart text-success"></i> Resumen</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Compras Hoy</span>
+                                <strong>@Model.ComprasHoy</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Ingresos Hoy</span>
+                                <strong class="text-success">$@Model.IngresosHoy.ToString("N2")</strong>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Reservas Activas</span>
+                                <span class="badge badge-activa">@Model.ReservasActivas</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Reservas Canceladas</span>
+                                <span class="badge badge-cancelada">@Model.ReservasCanceladas</span>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between">
+                                <span>Comisiones Totales</span>
+                                <strong class="text-primary">$@Model.ComisionesTotales.ToString("N2")</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white border-0 py-3">
+                            <h5 class="mb-0"><i class="bi bi-hdd-network text-warning"></i> Estado APIs</h5>
+                        </div>
+                        <div class="card-body">
+                            @{
+                                var proveedoresRest = Model.EstadoProveedores.Count(p => p.TieneRest);
+                                var proveedoresSoap = Model.EstadoProveedores.Count(p => p.TieneSoap);
+                            }
+                            <div class="d-flex justify-content-between mb-2">
+                                <span><span class="badge badge-rest">REST</span> Configurados</span>
+                                <strong>@proveedoresRest</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span><span class="badge badge-soap">SOAP</span> Configurados</span>
+                                <strong>@proveedoresSoap</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="card-body p-4">
-            <div class="tab-content" id="myTabContent">
-
-                <div class="tab-pane fade show active" id="config" role="tabpanel">
-                    <form id="configForm">
-
-                        <div class="mb-4 pb-3 border-bottom">
-                            <label class="form-label fw-bold">IVA Global (%)</label>
-                            <div class="input-group" style="max-width: 200px;">
-                                <input type="number" class="form-control" id="ivaInput"
-                                       value="@ivaPercent"
-                                       min="0" max="100" step="1"
-                                       onkeypress="return (event.charCode >= 48 && event.charCode <= 57)"
-                                       oninput="if(this.value < 0) this.value = 0; if(this.value > 100) this.value = 100;">
-                                <span class="input-group-text">%</span>
-                            </div>
-                            <div class="form-text">Este impuesto se aplica al final de la compra (Máx 100%).</div>
-                        </div>
-
-                        <h5 class="mb-3">Configuración de Promociones</h5>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Estado de la Promoción</label>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="promoActive"
-                                       @(promoDiscount > 0 ? "checked" : "")>
-                                <label class="form-check-label" for="promoActive">Activar Descuentos</label>
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Porcentaje de Descuento (%)</label>
-                            <div class="input-group" style="max-width: 200px;">
-                                <input type="number"
-                                       class="form-control @(promoDiscount > 0 ? "" : "bg-light")"
-                                       id="discountInput"
-                                       value="@promoDiscount"
-                                       min="0" max="100" step="1"
-                                       onkeypress="return (event.charCode >= 48 && event.charCode <= 57)"
-                                       oninput="if(this.value < 0) this.value = 0; if(this.value > 100) this.value = 100;"
-                                       @(promoDiscount > 0 ? "" : "readonly")>
-                                <span class="input-group-text">%</span>
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="form-label fw-bold d-block">Aplicar descuento a:</label>
-                            <div class="card p-3 bg-light border-0">
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input cat-check" type="checkbox" value="HOTEL" id="checkHotel"
-                                                   @(activeCats.Contains("HOTEL") ? "checked" : "")>
-                                            <label class="form-check-label" for="checkHotel">🏨 Hoteles</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input cat-check" type="checkbox" value="FLIGHT" id="checkFlight"
-                                                   @(activeCats.Contains("FLIGHT") ? "checked" : "")>
-                                            <label class="form-check-label" for="checkFlight">✈️ Vuelos</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input cat-check" type="checkbox" value="CAR" id="checkCar"
-                                                   @(activeCats.Contains("CAR") ? "checked" : "")>
-                                            <label class="form-check-label" for="checkCar">🚗 Autos</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input cat-check" type="checkbox" value="RESTAURANT" id="checkRest"
-                                                   @(activeCats.Contains("RESTAURANT") ? "checked" : "")>
-                                            <label class="form-check-label" for="checkRest">🍽️ Restaurantes</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-text">
-                                Si no seleccionas ninguno, el descuento no se aplicará a nada aunque esté activo.
-                            </div>
-                        </div>
-
-                        <button type="button" onclick="saveConfig()" class="btn btn-primary btn-lg w-100">
-                            <i class="bi bi-save"></i> Guardar Configuración
-                        </button>
-                    </form>
+        <!-- Clientes -->
+        <div class="tab-pane fade" id="tab-clientes">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-people text-primary"></i> Todos los Clientes</h5>
+                    <input type="text" class="form-control" style="max-width: 300px;" placeholder="Buscar cliente..." id="buscarCliente">
                 </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="tablaClientes">
+                            <thead class="table-admin">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre</th>
+                                    <th>Email</th>
+                                    <th>Documento</th>
+                                    <th>Compras</th>
+                                    <th class="text-end">Total Gastado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var cliente in Model.Clientes)
+                                {
+                                    <tr>
+                                        <td><span class="badge bg-light text-dark">#@cliente.Id</span></td>
+                                        <td class="fw-semibold">@cliente.Nombre @cliente.Apellido</td>
+                                        <td>@cliente.Email</td>
+                                        <td><code>@cliente.Documento</code></td>
+                                        <td><span class="badge bg-info">@cliente.TotalCompras</span></td>
+                                        <td class="text-end fw-bold text-success">$@cliente.TotalGastado.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                <div class="tab-pane fade" id="users" role="tabpanel">
-                    @if (Model != null && Model.Any())
-                    {
-                        @foreach (var user in Model.Where(u => !u.IsAdmin))
-                        {
-                            var historyId = $"history-{user.Email.Replace("@", "_").Replace(".", "_")}";
+        <!-- Compras -->
+        <div class="tab-pane fade" id="tab-compras">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0"><i class="bi bi-receipt text-success"></i> Todas las Compras</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-admin">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Cliente</th>
+                                    <th>Fecha</th>
+                                    <th>Reservas</th>
+                                    <th class="text-end">Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var compra in Model.UltimasCompras)
+                                {
+                                    <tr>
+                                        <td><span class="badge bg-light text-dark">#@compra.Id</span></td>
+                                        <td>
+                                            <div class="fw-semibold">@compra.ClienteNombre</div>
+                                            <small class="text-muted">@compra.ClienteEmail</small>
+                                        </td>
+                                        <td>@compra.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td>
+                                            @foreach (var reserva in compra.Reservas)
+                                            {
+                                                <span class="badge @(reserva.Activa ? "bg-success" : "bg-secondary") me-1">
+                                                    @reserva.CodigoReserva
+                                                </span>
+                                            }
+                                        </td>
+                                        <td class="text-end fw-bold text-success">$@compra.Total.ToString("N2")</td>
+                                        <td>
+                                            <a asp-action="FacturaTravelio" asp-route-compraId="@compra.Id" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-file-earmark-pdf"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                            <div class="border rounded p-3 mb-3">
-                                <div class="d-flex justify-content-between align-items-start">
+        <!-- Reservas -->
+        <div class="tab-pane fade" id="tab-reservas">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-bookmark text-info"></i> Todas las Reservas</h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="text" class="form-control form-control-sm" style="width: 200px;" placeholder="Buscar reserva..." id="buscarReserva">
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary btn-sm active" onclick="filtrarReservas('todas', this)">Todas</button>
+                            <button class="btn btn-outline-success btn-sm" onclick="filtrarReservas('activas', this)">Activas</button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="filtrarReservas('canceladas', this)">Canceladas</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="tablaReservas">
+                            <thead class="table-admin">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Codigo</th>
+                                    <th>Proveedor</th>
+                                    <th>Tipo</th>
+                                    <th>Cliente</th>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var reserva in Model.Reservas)
+                                {
+                                    <tr class="reserva-row" data-activa="@reserva.Activa.ToString().ToLower()" data-id="@reserva.Id">
+                                        <td><span class="badge bg-light text-dark">#@reserva.Id</span></td>
+                                        <td><code class="user-select-all">@reserva.CodigoReserva</code></td>
+                                        <td>@reserva.Proveedor</td>
+                                        <td>
+                                            @{
+                                                var iconoTipo = reserva.TipoServicio switch {
+                                                    "RentaVehiculos" => "??",
+                                                    "Hotel" => "??",
+                                                    "Aerolinea" => "??",
+                                                    "Restaurante" => "???",
+                                                    "PaquetesTuristicos" => "??",
+                                                    _ => "??"
+                                                };
+                                            }
+                                            <span>@iconoTipo</span>
+                                        </td>
+                                        <td>@reserva.ClienteNombre</td>
+                                        <td>
+                                            @if (reserva.FechaCompra.HasValue)
+                                            {
+                                                <small>@reserva.FechaCompra.Value.ToString("dd/MM/yy")</small>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (reserva.Activa)
+                                            {
+                                                <span class="badge badge-activa">Activa</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-cancelada">Cancelada</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                @if (!string.IsNullOrEmpty(reserva.FacturaUrl))
+                                                {
+                                                    <a href="@reserva.FacturaUrl" target="_blank" class="btn btn-outline-secondary" title="Ver factura proveedor">
+                                                        <i class="bi bi-file-pdf"></i>
+                                                    </a>
+                                                }
+                                                @if (reserva.Activa)
+                                                {
+                                                    <button class="btn btn-outline-danger" onclick="cancelarReservaAdmin(@reserva.Id)" title="Cancelar reserva">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Proveedores -->
+        <div class="tab-pane fade" id="tab-proveedores">
+            <div class="row g-4">
+                @foreach (var proveedor in Model.EstadoProveedores)
+                {
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card provider-card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
                                     <div>
-                                        <h6 class="fw-bold mb-0">@user.Nombre @user.Apellido</h6>
-                                        <div class="text-muted small">@user.Email</div>
+                                        <h6 class="fw-bold mb-1">@proveedor.Nombre</h6>
+                                        <span class="badge bg-secondary">@proveedor.TipoServicio</span>
                                     </div>
-
-                                    <button type="button" class="btn btn-link btn-sm text-decoration-none p-0"
-                                            data-bs-toggle="collapse" data-bs-target="#@historyId"
-                                            aria-expanded="false" aria-controls="@historyId">
-                                        Ver historial &gt;
-                                    </button>
+                                    <span class="status-dot @(proveedor.Activo ? "status-online" : "status-offline")" 
+                                          title="@(proveedor.Activo ? "Activo" : "Inactivo")"></span>
                                 </div>
-
-                                @if (user.Orders != null && user.Orders.Any())
-                                {
-                                    var lastOrder = user.Orders.OrderByDescending(o => o.Date).First();
-                                    <div class="mt-3 bg-light p-2 rounded small">
-                                        <strong>Última compra:</strong> $@lastOrder.Total.ToString("N2")
-                                        <span class="text-muted">(@lastOrder.Date.ToShortDateString())</span>
+                                
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="badge badge-rest">REST</span>
+                                        @if (proveedor.TieneRest)
+                                        {
+                                            <span class="text-success small"><i class="bi bi-check-circle"></i> Configurado</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small"><i class="bi bi-x-circle"></i> No disponible</span>
+                                        }
                                     </div>
-                                }
-                                else
-                                {
-                                    <div class="mt-3 text-muted small fst-italic">Sin compras recientes.</div>
-                                }
-
-                                <div class="collapse mt-3" id="@historyId">
-                                    @if (user.Orders != null && user.Orders.Any())
+                                    @if (proveedor.TieneRest && !string.IsNullOrEmpty(proveedor.UrlRest))
                                     {
-                                        <div class="table-responsive">
-                                            <table class="table table-sm align-middle mb-0">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th>Orden ID</th>
-                                                        <th>Fecha</th>
-                                                        <th>Detalle</th>
-                                                        <th class="text-end">Total</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach (var order in user.Orders.OrderByDescending(o => o.Date))
-                                                    {
-                                                        <tr>
-                                                            <td><small>#@order.OrderId</small></td>
-                                                            <td>@order.Date.ToString("dd/MM/yyyy HH:mm")</td>
-                                                            <td class="small">
-                                                                @if (order.Items != null && order.Items.Any())
-                                                                {
-                                                                    <ul class="list-unstyled mb-0 ps-2">
-                                                                        @foreach (var item in order.Items)
-                                                                        {
-                                                            <li class="mb-2 border-bottom pb-1">
-                                                                                <span class="badge bg-secondary text-white" style="font-size: 0.7em;">@item.Tipo</span>
-                                                                                <strong>@item.Titulo</strong>
-                                                                                @if (!string.IsNullOrEmpty(item.CodigoReserva))
-                                                                                {
-                                                                                    <div class="text-muted fst-italic ms-1">Reserva #@item.CodigoReserva</div>
-                                                                                }
-                                                                                <div>
-                                                                                    @item.Cantidad x $@item.PrecioUnitario.ToString("N2")
-                                                                                    = <strong>$@item.Total.ToString("N2")</strong>
-                                                                                </div>
-                                                                            </li>
-                                                                        }
-                                                                    </ul>
-                                                                }
-                                                            </td>
-                                                            <td class="text-end fw-bold">$@order.Total.ToString("N2")</td>
-                                                        </tr>
-                                                    }
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        <div class="p-2 text-center text-muted">No hay historial disponible.</div>
+                                        <small class="text-muted d-block text-truncate" title="@proveedor.UrlRest">@proveedor.UrlRest</small>
                                     }
                                 </div>
+
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="badge badge-soap">SOAP</span>
+                                        @if (proveedor.TieneSoap)
+                                        {
+                                            <span class="text-success small"><i class="bi bi-check-circle"></i> Configurado</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small"><i class="bi bi-x-circle"></i> No disponible</span>
+                                        }
+                                    </div>
+                                    @if (proveedor.TieneSoap && !string.IsNullOrEmpty(proveedor.UrlSoap))
+                                    {
+                                        <small class="text-muted d-block text-truncate" title="@proveedor.UrlSoap">@proveedor.UrlSoap</small>
+                                    }
+                                </div>
+
+                                <button class="btn btn-sm btn-outline-primary w-100" onclick="verificarProveedor(@proveedor.ServicioId, this)">
+                                    <i class="bi bi-arrow-repeat"></i> Verificar Conexion
+                                </button>
+                                <div class="resultado-verificacion mt-2 small"></div>
                             </div>
-                        }
-                    }
-                    else
-                    {
-                        <div class="alert alert-info">No hay usuarios registrados.</div>
-                    }
-                </div>
+                        </div>
+                    </div>
+                }
             </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        // Controlar si el input de descuento está activo o no
-        document.getElementById('promoActive').addEventListener('change', function (e) {
-            const input = document.getElementById('discountInput');
-            if (e.target.checked) {
-                input.readOnly = false;
-                input.classList.remove('bg-light');
-                if (input.value === "0") input.value = "10";
-            } else {
-                input.readOnly = true;
-                input.classList.add('bg-light');
-                input.value = "0";
-                document.querySelectorAll('.cat-check').forEach(c => c.checked = false);
+<script>
+    // Buscar clientes
+    document.getElementById('buscarCliente')?.addEventListener('input', function(e) {
+        const busqueda = e.target.value.toLowerCase();
+        document.querySelectorAll('#tablaClientes tbody tr').forEach(row => {
+            const texto = row.textContent.toLowerCase();
+            row.style.display = texto.includes(busqueda) ? '' : 'none';
+        });
+    });
+
+    // Buscar reservas
+    document.getElementById('buscarReserva')?.addEventListener('input', function(e) {
+        const busqueda = e.target.value.toLowerCase();
+        document.querySelectorAll('#tablaReservas tbody tr').forEach(row => {
+            const texto = row.textContent.toLowerCase();
+            row.style.display = texto.includes(busqueda) ? '' : 'none';
+        });
+    });
+
+    // Filtrar reservas
+    function filtrarReservas(tipo, btn) {
+        // Actualizar botones activos
+        if (btn) {
+            btn.parentElement.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+        
+        document.querySelectorAll('.reserva-row').forEach(row => {
+            const activa = row.dataset.activa === 'true';
+            if (tipo === 'todas') {
+                row.style.display = '';
+            } else if (tipo === 'activas') {
+                row.style.display = activa ? '' : 'none';
+            } else if (tipo === 'canceladas') {
+                row.style.display = !activa ? '' : 'none';
             }
         });
+    }
 
-        function saveConfig() {
-            const iva = document.getElementById('ivaInput').value;
-            const disc = document.getElementById('discountInput').value;
+    // Cancelar reserva desde admin
+    async function cancelarReservaAdmin(reservaId) {
+        if (!confirm('�Estas seguro de cancelar esta reserva?\n\nNota: Esta accion solo marca la reserva como cancelada en el sistema, no contacta al proveedor ni genera reembolso automatico.')) {
+            return;
+        }
 
-            let selectedCats = [];
-            document.querySelectorAll('.cat-check:checked').forEach((checkbox) => {
-                selectedCats.push(checkbox.value);
+        try {
+            const formData = new FormData();
+            formData.append('reservaId', reservaId);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value || '');
+
+            const response = await fetch('/Home/CancelarReservaAdminApi', {
+                method: 'POST',
+                body: formData
             });
 
-            let formData = new FormData();
-            formData.append('iva', iva);
-            formData.append('discount', disc);
-            formData.append('categories', selectedCats.join(','));
+            const data = await response.json();
 
-            fetch('/Home/UpdateConfig', { method: 'POST', body: formData })
-                .then(res => {
-                    if (res.ok) Swal.fire('Guardado', 'Configuración actualizada correctamente', 'success');
-                    else Swal.fire('Error', 'No se pudo guardar la configuración', 'error');
-                })
-                .catch(err => Swal.fire('Error', 'Fallo de conexión con el servidor', 'error'));
+            if (data.success) {
+                alert('? ' + data.message);
+                // Actualizar la fila visualmente
+                const row = document.querySelector(`tr[data-id="${reservaId}"]`);
+                if (row) {
+                    row.dataset.activa = 'false';
+                    row.querySelector('.badge-activa')?.classList.replace('badge-activa', 'badge-cancelada');
+                    row.querySelector('.badge-cancelada').textContent = 'Cancelada';
+                    row.querySelector('.btn-outline-danger')?.remove();
+                }
+            } else {
+                alert('? ' + data.message);
+            }
+        } catch (error) {
+            alert('Error al cancelar la reserva');
+            console.error(error);
         }
-    </script>
+    }
+
+    // Verificar proveedor
+    async function verificarProveedor(servicioId, btn) {
+        const container = btn.parentElement.querySelector('.resultado-verificacion');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verificando...';
+        container.innerHTML = '';
+
+        try {
+            const response = await fetch(`/Home/VerificarProveedorApi?servicioId=${servicioId}`);
+            const data = await response.json();
+
+            if (data.success && data.resultados) {
+                let html = '';
+                data.resultados.forEach(r => {
+                    const icon = r.disponible ? '?' : '?';
+                    html += `<div class="${r.disponible ? 'text-success' : 'text-danger'}">${icon} ${r.protocolo}: ${r.mensaje}</div>`;
+                });
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `<div class="text-danger">Error: ${data.message || 'No se pudo verificar'}</div>`;
+            }
+        } catch (error) {
+            container.innerHTML = `<div class="text-danger">Error de conexion</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Verificar Conexion';
+        }
+    }
+
+    // Verificar todos los proveedores al cargar la pagina de proveedores
+    document.querySelector('[data-bs-target="#tab-proveedores"]')?.addEventListener('shown.bs.tab', function() {
+        // Opcional: verificar todos automaticamente
+        // document.querySelectorAll('.provider-card button').forEach(btn => btn.click());
+    });
+</script>
+@Html.AntiForgeryToken()
 }

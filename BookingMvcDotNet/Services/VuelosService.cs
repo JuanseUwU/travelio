@@ -6,6 +6,10 @@ using TravelioAPIConnector.Aerolinea;
 
 namespace BookingMvcDotNet.Services;
 
+/// <summary>
+/// Implementacion del servicio de vuelos que usa TravelioAPIConnector para REST/SOAP.
+/// Prioriza REST y usa SOAP como fallback. Cancelacion solo disponible en REST.
+/// </summary>
 public class VuelosService(TravelioDbContext dbContext, ILogger<VuelosService> logger) : IVuelosService
 {
     public async Task<VuelosSearchViewModel> BuscarVuelosAsync(VuelosSearchViewModel filtros)
@@ -38,27 +42,41 @@ public class VuelosService(TravelioDbContext dbContext, ILogger<VuelosService> l
             {
                 try
                 {
-                    var detalle = detalles
-                        .Where(d => d.ServicioId == servicio.Id && d.TipoProtocolo == TipoProtocolo.Soap)
-                        .FirstOrDefault();
+                    var detalleRest = detalles.FirstOrDefault(d => d.ServicioId == servicio.Id && d.TipoProtocolo == TipoProtocolo.Rest);
+                    var detalleSoap = detalles.FirstOrDefault(d => d.ServicioId == servicio.Id && d.TipoProtocolo == TipoProtocolo.Soap);
 
-                    if (detalle == null) continue;
+                    Vuelo[] vuelos = [];
+                    bool usandoRest = false;
 
-                    var uri = $"{detalle.UriBase}{detalle.ObtenerProductosEndpoint}";
+                    // Intentar REST primero
+                    if (detalleRest != null)
+                    {
+                        try
+                        {
+                            var uriRest = $"{detalleRest.UriBase}{detalleRest.ObtenerProductosEndpoint}";
+                            logger.LogInformation("Consultando {Servicio} (REST): {Uri}", servicio.Nombre, uriRest);
 
-                    logger.LogInformation("Consultando {Servicio} (SOAP): {Uri}", servicio.Nombre, uri);
+                            vuelos = await Connector.GetVuelosAsync(
+                                uriRest, filtros.Origen, filtros.Destino, filtros.FechaSalida, null,
+                                filtros.TipoCabina, filtros.Pasajeros, filtros.PrecioMin, filtros.PrecioMax);
+                            usandoRest = true;
+                        }
+                        catch (Exception exRest)
+                        {
+                            logger.LogWarning(exRest, "REST fallo para {Servicio}, intentando SOAP", servicio.Nombre);
+                        }
+                    }
 
-                    var vuelos = await Connector.GetVuelosAsync(
-                        uri,
-                        filtros.Origen,
-                        filtros.Destino,
-                        filtros.FechaSalida,
-                        null,
-                        filtros.TipoCabina,
-                        filtros.Pasajeros,
-                        filtros.PrecioMin,
-                        filtros.PrecioMax
-                    );
+                    // Fallback a SOAP si REST fallo o no existe
+                    if (!usandoRest && detalleSoap != null)
+                    {
+                        var uriSoap = $"{detalleSoap.UriBase}{detalleSoap.ObtenerProductosEndpoint}";
+                        logger.LogInformation("Consultando {Servicio} (SOAP): {Uri}", servicio.Nombre, uriSoap);
+
+                        vuelos = await Connector.GetVuelosAsync(
+                            uriSoap, filtros.Origen, filtros.Destino, filtros.FechaSalida, null,
+                            filtros.TipoCabina, filtros.Pasajeros, filtros.PrecioMin, filtros.PrecioMax, forceSoap: true);
+                    }
 
                     foreach (var v in vuelos)
                     {
@@ -79,7 +97,8 @@ public class VuelosService(TravelioDbContext dbContext, ILogger<VuelosService> l
                         });
                     }
 
-                    logger.LogInformation("Encontrados {Count} vuelos en {Servicio}", vuelos.Length, servicio.Nombre);
+                    logger.LogInformation("Encontrados {Count} vuelos en {Servicio} ({Protocolo})",
+                        vuelos.Length, servicio.Nombre, usandoRest ? "REST" : "SOAP");
                 }
                 catch (Exception ex)
                 {
@@ -91,7 +110,7 @@ public class VuelosService(TravelioDbContext dbContext, ILogger<VuelosService> l
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error en búsqueda de vuelos");
+            logger.LogError(ex, "Error en busqueda de vuelos");
             resultado.ErrorMessage = "Error al buscar vuelos. Intente nuevamente.";
         }
 
@@ -105,17 +124,32 @@ public class VuelosService(TravelioDbContext dbContext, ILogger<VuelosService> l
             var servicio = await dbContext.Servicios.FirstOrDefaultAsync(s => s.Id == servicioId);
             if (servicio == null) return null;
 
-            var detalle = await dbContext.DetallesServicio
-                .Where(d => d.ServicioId == servicioId && d.TipoProtocolo == TipoProtocolo.Soap)
-                .FirstOrDefaultAsync();
+            var detalles = await dbContext.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
 
-            if (detalle == null) return null;
+            var detalleRest = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest);
+            var detalleSoap = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Soap);
 
-            var uri = $"{detalle.UriBase}{detalle.ObtenerProductosEndpoint}";
+            Vuelo[] vuelos = [];
 
-            var vuelos = await Connector.GetVuelosAsync(uri);
+            if (detalleRest != null)
+            {
+                try
+                {
+                    var uri = $"{detalleRest.UriBase}{detalleRest.ObtenerProductosEndpoint}";
+                    vuelos = await Connector.GetVuelosAsync(uri);
+                }
+                catch { /* Fallback a SOAP */ }
+            }
+
+            if (vuelos.Length == 0 && detalleSoap != null)
+            {
+                var uri = $"{detalleSoap.UriBase}{detalleSoap.ObtenerProductosEndpoint}";
+                vuelos = await Connector.GetVuelosAsync(uri, forceSoap: true);
+            }
+
             var vuelo = vuelos.FirstOrDefault(v => v.IdVuelo == idVuelo);
-
             if (string.IsNullOrEmpty(vuelo.IdVuelo)) return null;
 
             return new VueloDetalleViewModel
@@ -145,15 +179,30 @@ public class VuelosService(TravelioDbContext dbContext, ILogger<VuelosService> l
     {
         try
         {
-            var detalle = await dbContext.DetallesServicio
-                .Where(d => d.ServicioId == servicioId && d.TipoProtocolo == TipoProtocolo.Soap)
-                .FirstOrDefaultAsync();
+            var detalles = await dbContext.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
 
-            if (detalle == null) return false;
+            var detalleRest = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest);
+            var detalleSoap = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Soap);
 
-            var uri = $"{detalle.UriBase}{detalle.ConfirmarProductoEndpoint}";
+            if (detalleRest != null)
+            {
+                try
+                {
+                    var uri = $"{detalleRest.UriBase}{detalleRest.ConfirmarProductoEndpoint}";
+                    return await Connector.VerificarDisponibilidadVueloAsync(uri, idVuelo, pasajeros);
+                }
+                catch { /* Fallback a SOAP */ }
+            }
 
-            return await Connector.VerificarDisponibilidadVueloAsync(uri, idVuelo, pasajeros);
+            if (detalleSoap != null)
+            {
+                var uri = $"{detalleSoap.UriBase}{detalleSoap.ConfirmarProductoEndpoint}";
+                return await Connector.VerificarDisponibilidadVueloAsync(uri, idVuelo, pasajeros, forceSoap: true);
+            }
+
+            return false;
         }
         catch (Exception ex)
         {

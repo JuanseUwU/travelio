@@ -97,6 +97,14 @@
                     </p>
                 </div>
             </div>
+
+            <!-- Recomendaciones -->
+            <div class="card border-0 shadow-sm mb-4" id="recommendationsCard" style="display:none;">
+                <div class="card-body">
+                    <h4 class="card-title">También te puede interesar en la misma ciudad</h4>
+                    <div id="recommendationsContainer" class="row g-3 mt-3"></div>
+                </div>
+            </div>
         </div>
 
         <div class="col-lg-4">
@@ -163,4 +171,54 @@
         }
         return sb.ToString();
     }
+}
+
+@section Scripts {
+    <script>
+        (function(){
+            // Cargar recomendaciones automáticamente para la ciudad del servicio
+            const ciudad = '@(Model.Ciudad ?? "")';
+            const tipo = '@(Model.Tipo ?? "")';
+            const titulo = '@(Model.Titulo ?? "")';
+
+            async function loadRecommendations() {
+                if (!ciudad) return;
+                try {
+                    const url = `/Home/RecomendacionesCiudad?ciudad=${encodeURIComponent(ciudad)}&excludeTipo=${encodeURIComponent(tipo)}&excludeTitulo=${encodeURIComponent(titulo)}&limit=6`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (!data.success || !data.items || data.items.length === 0) return;
+
+                    const container = document.getElementById('recommendationsContainer');
+                    container.innerHTML = '';
+
+                    data.items.forEach(item => {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-6';
+                        col.innerHTML = `
+                            <div class="card p-2 h-100">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="fw-bold">${item.titulo}</div>
+                                        <div class="small text-muted">${item.tipo} · ${item.ciudad}</div>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="fw-bold text-primary">$${(item.precio||0).toFixed(2)}</div>
+                                        <a class="btn btn-sm btn-outline-primary mt-2" href="/Home/Detalles?tipo=${encodeURIComponent(item.tipo)}&titulo=${encodeURIComponent(item.titulo)}">Ver</a>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(col);
+                    });
+
+                    document.getElementById('recommendationsCard').style.display = 'block';
+                } catch (e) {
+                    // ignore
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', loadRecommendations);
+        })();
+    </script>
 }

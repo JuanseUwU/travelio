@@ -7,7 +7,7 @@ namespace TravelioREST.Autos;
 
 public class CancelarReservaResponse
 {
-    public int ValorPagado { get; set; }
+    public decimal ValorPagado { get; set; }
     public bool Exito { get; set; }
 }
 

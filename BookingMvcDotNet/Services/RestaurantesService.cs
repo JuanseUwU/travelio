@@ -3,9 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using TravelioDatabaseConnector.Data;
 using TravelioDatabaseConnector.Enums;
 using MesaConnector = TravelioAPIConnector.Mesas.Connector;
+using TravelioAPIConnector.Mesas;
 
 namespace BookingMvcDotNet.Services;
 
+/// <summary>
+/// Implementacion del servicio de restaurantes que usa TravelioAPIConnector para REST/SOAP.
+/// Prioriza REST y usa SOAP como fallback. Cancelacion solo disponible en REST.
+/// </summary>
 public class RestaurantesService(TravelioDbContext dbContext, ILogger<RestaurantesService> logger) : IRestaurantesService
 {
     public async Task<MesasSearchViewModel> BuscarMesasAsync(MesasSearchViewModel filtros)
@@ -35,22 +40,37 @@ public class RestaurantesService(TravelioDbContext dbContext, ILogger<Restaurant
             {
                 try
                 {
-                    var detalle = detalles
-                        .Where(d => d.ServicioId == servicio.Id && d.TipoProtocolo == TipoProtocolo.Soap)
-                        .FirstOrDefault();
+                    var detalleRest = detalles.FirstOrDefault(d => d.ServicioId == servicio.Id && d.TipoProtocolo == TipoProtocolo.Rest);
+                    var detalleSoap = detalles.FirstOrDefault(d => d.ServicioId == servicio.Id && d.TipoProtocolo == TipoProtocolo.Soap);
 
-                    if (detalle == null) continue;
+                    Mesa[] mesas = [];
+                    bool usandoRest = false;
 
-                    var uri = $"{detalle.UriBase}{detalle.ObtenerProductosEndpoint}";
+                    // Intentar REST primero
+                    if (detalleRest != null)
+                    {
+                        try
+                        {
+                            var uriRest = $"{detalleRest.UriBase}{detalleRest.ObtenerProductosEndpoint}";
+                            logger.LogInformation("Consultando {Servicio} (REST): {Uri}", servicio.Nombre, uriRest);
 
-                    logger.LogInformation("Consultando {Servicio} (SOAP): {Uri}", servicio.Nombre, uri);
+                            mesas = await MesaConnector.BuscarMesasAsync(uriRest, filtros.Capacidad, filtros.TipoMesa, "Disponible");
+                            usandoRest = true;
+                        }
+                        catch (Exception exRest)
+                        {
+                            logger.LogWarning(exRest, "REST fallo para {Servicio}, intentando SOAP", servicio.Nombre);
+                        }
+                    }
 
-                    var mesas = await MesaConnector.BuscarMesasAsync(
-                        uri,
-                        filtros.Capacidad,
-                        filtros.TipoMesa,
-                        "Disponible"
-                    );
+                    // Fallback a SOAP si REST fallo o no existe
+                    if (!usandoRest && detalleSoap != null)
+                    {
+                        var uriSoap = $"{detalleSoap.UriBase}{detalleSoap.ObtenerProductosEndpoint}";
+                        logger.LogInformation("Consultando {Servicio} (SOAP): {Uri}", servicio.Nombre, uriSoap);
+
+                        mesas = await MesaConnector.BuscarMesasAsync(uriSoap, filtros.Capacidad, filtros.TipoMesa, "Disponible", forceSoap: true);
+                    }
 
                     foreach (var m in mesas)
                     {
@@ -69,7 +89,8 @@ public class RestaurantesService(TravelioDbContext dbContext, ILogger<Restaurant
                         });
                     }
 
-                    logger.LogInformation("Encontradas {Count} mesas en {Servicio}", mesas.Length, servicio.Nombre);
+                    logger.LogInformation("Encontradas {Count} mesas en {Servicio} ({Protocolo})",
+                        mesas.Length, servicio.Nombre, usandoRest ? "REST" : "SOAP");
                 }
                 catch (Exception ex)
                 {
@@ -81,7 +102,7 @@ public class RestaurantesService(TravelioDbContext dbContext, ILogger<Restaurant
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error en búsqueda de mesas");
+            logger.LogError(ex, "Error en busqueda de mesas");
             resultado.ErrorMessage = "Error al buscar mesas. Intente nuevamente.";
         }
 
@@ -95,16 +116,32 @@ public class RestaurantesService(TravelioDbContext dbContext, ILogger<Restaurant
             var servicio = await dbContext.Servicios.FirstOrDefaultAsync(s => s.Id == servicioId);
             if (servicio == null) return null;
 
-            var detalle = await dbContext.DetallesServicio
-                .Where(d => d.ServicioId == servicioId && d.TipoProtocolo == TipoProtocolo.Soap)
-                .FirstOrDefaultAsync();
+            var detalles = await dbContext.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
 
-            if (detalle == null) return null;
+            var detalleRest = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest);
+            var detalleSoap = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Soap);
 
-            var uri = $"{detalle.UriBase}{detalle.ObtenerProductosEndpoint}";
-            var mesas = await MesaConnector.BuscarMesasAsync(uri);
+            Mesa[] mesas = [];
+
+            if (detalleRest != null)
+            {
+                try
+                {
+                    var uri = $"{detalleRest.UriBase}{detalleRest.ObtenerProductosEndpoint}";
+                    mesas = await MesaConnector.BuscarMesasAsync(uri);
+                }
+                catch { /* Fallback a SOAP */ }
+            }
+
+            if (mesas.Length == 0 && detalleSoap != null)
+            {
+                var uri = $"{detalleSoap.UriBase}{detalleSoap.ObtenerProductosEndpoint}";
+                mesas = await MesaConnector.BuscarMesasAsync(uri, forceSoap: true);
+            }
+
             var mesa = mesas.FirstOrDefault(m => m.IdMesa == idMesa);
-
             if (mesa.IdMesa == 0) return null;
 
             return new MesaDetalleViewModel
@@ -132,14 +169,30 @@ public class RestaurantesService(TravelioDbContext dbContext, ILogger<Restaurant
     {
         try
         {
-            var detalle = await dbContext.DetallesServicio
-                .Where(d => d.ServicioId == servicioId && d.TipoProtocolo == TipoProtocolo.Soap)
-                .FirstOrDefaultAsync();
+            var detalles = await dbContext.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
 
-            if (detalle == null) return false;
+            var detalleRest = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest);
+            var detalleSoap = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Soap);
 
-            var uri = $"{detalle.UriBase}{detalle.ConfirmarProductoEndpoint}";
-            return await MesaConnector.ValidarDisponibilidadAsync(uri, idMesa, fecha, personas);
+            if (detalleRest != null)
+            {
+                try
+                {
+                    var uri = $"{detalleRest.UriBase}{detalleRest.ConfirmarProductoEndpoint}";
+                    return await MesaConnector.ValidarDisponibilidadAsync(uri, idMesa, fecha, personas);
+                }
+                catch { /* Fallback a SOAP */ }
+            }
+
+            if (detalleSoap != null)
+            {
+                var uri = $"{detalleSoap.UriBase}{detalleSoap.ConfirmarProductoEndpoint}";
+                return await MesaConnector.ValidarDisponibilidadAsync(uri, idMesa, fecha, personas, forceSoap: true);
+            }
+
+            return false;
         }
         catch (Exception ex)
         {

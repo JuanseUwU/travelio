@@ -11,11 +11,39 @@ namespace BookingMvcDotNet.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<BookingService> _logger;
+        // null = unknown, true = available, false = not available
+        private bool? _remoteAvailable = null;
 
         public BookingService(HttpClient httpClient, ILogger<BookingService> logger)
         {
             _httpClient = httpClient;
             _logger = logger;
+        }
+
+        private async Task<bool> IsRemoteAvailableAsync()
+        {
+            if (_remoteAvailable.HasValue) return _remoteAvailable.Value;
+
+            if (_httpClient.BaseAddress == null)
+            {
+                _remoteAvailable = false;
+                return false;
+            }
+
+            try
+            {
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(2));
+                var ping = new HttpRequestMessage(HttpMethod.Get, "");
+                var resp = await _httpClient.SendAsync(ping, cts.Token);
+                _remoteAvailable = resp.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Remote booking API not available at {BaseAddress}", _httpClient.BaseAddress);
+                _remoteAvailable = false;
+            }
+
+            return _remoteAvailable.Value;
         }
 
         // =====================================================
@@ -25,6 +53,28 @@ namespace BookingMvcDotNet.Services
         {
             try
             {
+                // Si la API remota no está disponible, devolvemos datos mock locales para evitar errores en la UI.
+                if (!await IsRemoteAvailableAsync())
+                {
+                    var mock = new ResultsViewModel
+                    {
+                        Query = null,
+                        Items = new System.Collections.Generic.List<ResultItemViewModel>
+                        {
+                            new ResultItemViewModel { Tipo = "HOTEL", Titulo = "Hotel Campestre", Ciudad = "Cuenca", Precio = 45, Rating = 4.6, UnidadPrecio = "por noche" },
+                            new ResultItemViewModel { Tipo = "CAR", Titulo = "Kia Sportage SUV", Ciudad = "Cuenca", Precio = 20, Rating = 4.4, UnidadPrecio = "/día" },
+                            new ResultItemViewModel { Tipo = "FLIGHT", Titulo = "Withfly - Quito", Ciudad = "Quito", Precio = 120, Rating = 4.7, UnidadPrecio = "por tramo" }
+                        }
+                    };
+
+                    return new ServiceResponse<ResultsViewModel>
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Data = mock
+                    };
+                }
+
                 // Ajusta el endpoint a lo que tengas del lado SOAP / API
                 // Ejemplo: GET /api/home
                 var response = await _httpClient.GetAsync("api/home");
@@ -59,6 +109,17 @@ namespace BookingMvcDotNet.Services
                 if (!string.IsNullOrEmpty(tipo)) query["tipo"] = tipo;
                 if (checkIn.HasValue) query["checkIn"] = checkIn.Value.ToString("yyyy-MM-dd");
                 if (checkOut.HasValue) query["checkOut"] = checkOut.Value.ToString("yyyy-MM-dd");
+
+                // Si la API remota no está disponible, devolvemos un resultado vacío en lugar de lanzar.
+                if (!await IsRemoteAvailableAsync())
+                {
+                    return new ServiceResponse<ResultsViewModel>
+                    {
+                        Success = true,
+                        StatusCode = 200,
+                        Data = new ResultsViewModel { Query = q, Tipo = tipo, CheckIn = checkIn, CheckOut = checkOut, Items = new System.Collections.Generic.List<ResultItemViewModel>() }
+                    };
+                }
 
                 // Ejemplo: GET /api/search?...
                 var response = await _httpClient.GetAsync($"api/search?{query}");

@@ -154,7 +154,6 @@
             let formData = new FormData();
             formData.append('tipo', tipo);
             formData.append('titulo', titulo);
-
             fetch('/Home/AgregarAlCarritoApi', { method: 'POST', body: formData })
             .then(response => response.json())
             .then(data => {
@@ -166,6 +165,57 @@
                         didOpen: (toast) => { toast.onmouseenter = Swal.stopTimer; toast.onmouseleave = Swal.resumeTimer; }
                     });
                     Toast.fire({ icon: 'success', title: data.message });
+
+                    // Mostrar recomendaciones en modal (incluso si está vacío mostramos mensaje)
+                    if (typeof data.recommendations !== 'undefined') {
+                        const list = data.recommendations || [];
+                        const container = document.getElementById('recommendationsContainer');
+                        if (container) {
+                            container.innerHTML = '';
+
+                            if (list.length === 0) {
+                                const emptyCol = document.createElement('div');
+                                emptyCol.className = 'col-12';
+                                emptyCol.innerHTML = '<div class="p-4 text-center text-muted">No hay recomendaciones por el momento.</div>';
+                                container.appendChild(emptyCol);
+                            } else {
+                                list.forEach(r => {
+                                    const card = document.createElement('div');
+                                    card.className = 'col-md-4 mb-3';
+                                    const tipo = r.tipo || '';
+                                    const titulo = r.titulo || '';
+                                    const ciudad = r.ciudad || '';
+                                    const precio = Number(r.precio || 0).toFixed(2);
+                                    card.innerHTML = `\
+                                        <div class="card h-100 shadow-sm">\
+                                            <div class="card-body d-flex flex-column">\
+                                                <h6 class="card-title text-truncate">${escapeHtml(titulo)}</h6>\
+                                                <div class="text-muted small mb-2">${escapeHtml(ciudad)} • ${escapeHtml(tipo)}</div>\
+                                                <div class="mt-auto d-flex justify-content-between align-items-center">\
+                                                    <div class="fw-bold">$${precio}</div>\
+                                                    <button class="btn btn-sm btn-primary" type="button">Agregar</button>\
+                                                </div>\
+                                            </div>\
+                                        </div>`;
+                                    // add click handler to button to avoid inline encoding issues
+                                    const btn = card.querySelector('button');
+                                    if (btn) {
+                                        btn.addEventListener('click', function () {
+                                            agregarItem(tipo, titulo);
+                                            hideRecommendations();
+                                        });
+                                    }
+                                    container.appendChild(card);
+                                });
+                            }
+
+                            var modalEl = document.getElementById('recommendationsModal');
+                            if (modalEl) {
+                                var modal = new bootstrap.Modal(modalEl);
+                                modal.show();
+                            }
+                        }
+                    }
                 }
             });
         }
@@ -184,6 +234,41 @@
                 .then(r => r.json())
                 .then(d => actualizarBadge(d.count));
         });
+
+        function hideRecommendations() {
+            var modalEl = document.getElementById('recommendationsModal');
+            if (modalEl) {
+                var modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+        }
+
+        function escapeHtml(unsafe) {
+            return String(unsafe)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
     </script>
+    
+    <!-- Recommendations modal -->
+    <div class="modal fade" id="recommendationsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Recomendaciones para tu destino</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row" id="recommendationsContainer"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
 </body>
 </html>

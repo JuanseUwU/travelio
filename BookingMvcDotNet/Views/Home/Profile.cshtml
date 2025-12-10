@@ -40,11 +40,17 @@
                                             <div class="d-flex align-items-center gap-3">
                                                 <div class="bg-light rounded p-2 text-center" style="width:45px; height:45px; display:flex; align-items:center; justify-content:center;">
                                                     <span style="font-size: 1.5rem;">
-                                                        @(item.Tipo == "HOTEL" ? "🏨" : item.Tipo == "FLIGHT" ? "✈️" : item.Tipo == "CAR" ? "🚗" : "🎫")
+                                                        @(item.Tipo == "HOTEL" ? "🏨" : item.Tipo == "FLIGHT" ? "✈️" : item.Tipo == "CAR" ? "🚗" : item.Tipo == "RESTAURANT" ? "🍽️" : "🎫")
                                                     </span>
                                                 </div>
                                                 <div>
-                                                    <div class="fw-semibold">@item.Titulo</div>
+                                                    <div class="fw-semibold">
+                                                        @item.Titulo
+                                                        @if (!item.Activa)
+                                                        {
+                                                            <span class="badge bg-secondary ms-2">Cancelada</span>
+                                                        }
+                                                    </div>
                                                     @if (!string.IsNullOrEmpty(item.CodigoReserva))
                                                     {
                                                         <small class="text-muted">Reserva: #@item.CodigoReserva</small>
@@ -52,14 +58,24 @@
                                                 </div>
                                             </div>
                                             <div class="text-end">
-                                                <div class="fw-bold">$@item.Total.ToString("N2")</div>
-                                                @if (!string.IsNullOrEmpty(item.FacturaProveedorUrl))
-                                                {
-                                                    <a href="@item.FacturaProveedorUrl" target="_blank" 
-                                                       class="btn btn-sm btn-outline-secondary mt-1">
-                                                        📄 Factura
-                                                    </a>
-                                                }
+                                                <div class="fw-bold @(item.Activa ? "" : "text-decoration-line-through text-muted")">$@item.Total.ToString("N2")</div>
+                                                <div class="d-flex gap-1 mt-1 flex-wrap justify-content-end">
+                                                    @if (!string.IsNullOrEmpty(item.FacturaProveedorUrl))
+                                                    {
+                                                        <a href="@item.FacturaProveedorUrl" target="_blank" 
+                                                           class="btn btn-sm btn-outline-secondary">
+                                                            📄 Factura
+                                                        </a>
+                                                    }
+                                                    @if (item.PuedeCancelar && item.Activa)
+                                                    {
+                                                        <button type="button" class="btn btn-sm btn-outline-danger btn-cancelar-reserva"
+                                                                data-reserva-id="@item.ReservaId"
+                                                                data-titulo="@item.Titulo">
+                                                            ❌ Cancelar
+                                                        </button>
+                                                    }
+                                                </div>
                                             </div>
                                         </div>
                                     </li>
@@ -83,8 +99,8 @@
             {
                 <div class="text-center py-5 bg-light rounded-3">
                     <div style="font-size: 4rem;" class="mb-3">🛒</div>
-                    <h5>Aún no tienes compras</h5>
-                    <p class="text-muted">Explora nuestros servicios y reserva tu próxima aventura.</p>
+                    <h5>Aun no tienes compras</h5>
+                    <p class="text-muted">Explora nuestros servicios y reserva tu proxima aventura.</p>
                     <div class="d-flex gap-2 justify-content-center">
                         <a asp-controller="Autos" asp-action="Index" class="btn btn-primary">
                             🚗 Ver Autos
@@ -110,15 +126,15 @@
                         <div>@Model.Email</div>
                     </div>
                     <div class="alert alert-success small mb-0">
-                        🔒 Tu cuenta está protegida.
+                        🔒 Tu cuenta esta protegida.
                     </div>
                 </div>
             </div>
             
-            <!-- Accesos rápidos -->
+            <!-- Accesos rapidos -->
             <div class="card shadow-sm border-0 mt-3">
                 <div class="card-body">
-                    <h6 class="card-title mb-3">🚀 Accesos rápidos</h6>
+                    <h6 class="card-title mb-3">🚀 Accesos rapidos</h6>
                     <div class="d-grid gap-2">
                         <a asp-controller="Autos" asp-action="Index" class="btn btn-outline-primary">
                             🚗 Rentar un auto
@@ -135,3 +151,80 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para cancelar reserva -->
+<div class="modal fade" id="modalCancelarReserva" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">❌ Cancelar Reserva</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estas seguro de que deseas cancelar la reserva de <strong id="nombreReservaCancelar"></strong>?</p>
+                <p class="text-muted small">El reembolso se depositara en tu cuenta bancaria.</p>
+                <div class="mb-3">
+                    <label class="form-label">Numero de cuenta bancaria para reembolso:</label>
+                    <input type="text" class="form-control" id="cuentaBancariaReembolso" placeholder="Ej: 123456789" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, mantener</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarCancelacion">Si, cancelar reserva</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let reservaIdACancelar = null;
+    
+    document.querySelectorAll('.btn-cancelar-reserva').forEach(btn => {
+        btn.addEventListener('click', function() {
+            reservaIdACancelar = this.dataset.reservaId;
+            document.getElementById('nombreReservaCancelar').textContent = this.dataset.titulo;
+            new bootstrap.Modal(document.getElementById('modalCancelarReserva')).show();
+        });
+    });
+
+    document.getElementById('btnConfirmarCancelacion').addEventListener('click', async function() {
+        const cuentaBancaria = document.getElementById('cuentaBancariaReembolso').value;
+        if (!cuentaBancaria) {
+            alert('Ingresa tu numero de cuenta bancaria');
+            return;
+        }
+
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Procesando...';
+
+        try {
+            const formData = new FormData();
+            formData.append('reservaId', reservaIdACancelar);
+            formData.append('cuentaBancaria', cuentaBancaria);
+            formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value || '');
+
+            const response = await fetch('@Url.Action("CancelarReservaApi", "Home")', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('✅ ' + data.message);
+                location.reload();
+            } else {
+                alert('❌ ' + data.message);
+            }
+        } catch (error) {
+            alert('Error al procesar la cancelacion');
+        } finally {
+            this.disabled = false;
+            this.innerHTML = 'Si, cancelar reserva';
+            bootstrap.Modal.getInstance(document.getElementById('modalCancelarReserva')).hide();
+        }
+    });
+</script>
+@Html.AntiForgeryToken()
+}

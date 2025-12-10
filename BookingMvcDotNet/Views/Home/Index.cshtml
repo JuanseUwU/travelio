@@ -108,7 +108,8 @@
         <form class="row g-3 align-items-end" asp-controller="Home" asp-action="Results" method="get">
             <div class="col-md-5">
                 <label class="form-label small fw-bold text-muted"><i class="bi bi-search"></i> ¿A dónde vas?</label>
-                <input type="text" class="form-control form-control-lg" name="q" placeholder="Ciudad o destino...">
+                <input id="searchCity" list="citiesList" type="text" class="form-control form-control-lg" name="q" placeholder="Ciudad o destino...">
+                <datalist id="citiesList"></datalist>
             </div>
             <div class="col-md-3">
                 <label class="form-label small fw-bold text-muted"><i class="bi bi-calendar3"></i> Fecha</label>
@@ -138,7 +139,7 @@
 <section class="container py-5">
     <div class="text-center mb-5">
         <h2 class="fw-bold"><i class="bi bi-rocket-takeoff text-primary"></i> Explora nuestros servicios</h2>
-        <p class="text-muted">5 módulos integrados con proveedores reales vía SOAP</p>
+        <p class="text-muted">5 módulos integrados con proveedores reales</p>
     </div>
 
     <div class="row g-4">
@@ -196,7 +197,7 @@
         <div class="row text-center">
             <div class="col-md-3 col-6 mb-3 mb-md-0">
                 <h2 class="fw-bold mb-0">27+</h2>
-                <small class="opacity-75">Proveedores SOAP</small>
+                <small class="opacity-75">Proveedores</small>
             </div>
             <div class="col-md-3 col-6 mb-3 mb-md-0">
                 <h2 class="fw-bold mb-0">5</h2>
@@ -204,7 +205,7 @@
             </div>
             <div class="col-md-3 col-6">
                 <h2 class="fw-bold mb-0">100%</h2>
-                <small class="opacity-75">Integración SOA</small>
+                <small class="opacity-75">Integración</small>
             </div>
             <div class="col-md-3 col-6">
                 <h2 class="fw-bold mb-0">24/7</h2>
@@ -318,7 +319,7 @@
                 </div>
                 <div class="card-body text-center">
                     <h6 class="fw-bold mb-1">Hotel Campestre</h6>
-                    <small class="text-muted">SOAP Integrado</small>
+                    <small class="text-muted">Integrado</small>
                 </div>
             </div>
         </div>
@@ -329,7 +330,7 @@
                 </div>
                 <div class="card-body text-center">
                     <h6 class="fw-bold mb-1">AllpahouseNYC</h6>
-                    <small class="text-muted">SOAP Integrado</small>
+                    <small class="text-muted">Integrado</small>
                 </div>
             </div>
         </div>
@@ -340,7 +341,7 @@
                 </div>
                 <div class="card-body text-center">
                     <h6 class="fw-bold mb-1">Brisamar</h6>
-                    <small class="text-muted">SOAP Integrado</small>
+                    <small class="text-muted">Integrado</small>
                 </div>
             </div>
         </div>
@@ -351,7 +352,7 @@
                 </div>
                 <div class="card-body text-center">
                     <h6 class="fw-bold mb-1">Hotel Andino</h6>
-                    <small class="text-muted">SOAP Integrado</small>
+                    <small class="text-muted">Integrado</small>
                 </div>
             </div>
         </div>
@@ -513,4 +514,34 @@
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+    <script>
+        // Cargar ciudades disponibles para el autocomplete
+        async function loadCities() {
+            try {
+                const res = await fetch('/Home/CiudadesDisponibles');
+                const data = await res.json();
+                if (data.success && data.cities) {
+                    const list = document.getElementById('citiesList');
+                    list.innerHTML = '';
+                    data.cities.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c;
+                        list.appendChild(opt);
+                    });
+                }
+            } catch (_) { }
+        }
+
+        // Si se selecciona una ciudad, opcionalmente mostrar recomendaciones (se usa en Detalles también)
+        async function showRecommendationsForCity(ciudad, excludeTipo, excludeTitulo) {
+            try {
+                const url = `/Home/RecomendacionesCiudad?ciudad=${encodeURIComponent(ciudad)}&excludeTipo=${encodeURIComponent(excludeTipo||'')}&excludeTitulo=${encodeURIComponent(excludeTitulo||'')}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                return data.items || [];
+            } catch { return []; }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() { loadCities(); });
+    </script>
 }

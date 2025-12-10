@@ -8,7 +8,7 @@ namespace TravelioAPIConnector;
 
 public static class Global
 {
-    public static bool IsREST { get; set; } = false;
+    public static bool IsREST { get; set; } = true;
 
     public static Binding GetBinding(string uri)
     {

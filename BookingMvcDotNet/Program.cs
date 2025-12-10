@@ -43,7 +43,13 @@ builder.Services.AddHttpClient<IBookingService, BookingService>(client =>
     {
         client.BaseAddress = new Uri(baseUrl);
     }
+    else
+    {
+        // Evitar InvalidOperationException cuando se usan URIs relativas en el servicio.
+        client.BaseAddress = new Uri("http://localhost:5000/");
+    }
 });
+// Nota: si tu API de backend está en otra URL, configura 'BookingApiBaseUrl' en appsettings.json o variables de entorno.
 
 var app = builder.Build();
 
