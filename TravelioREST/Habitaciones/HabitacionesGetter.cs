@@ -65,7 +65,7 @@ public static class HabitacionesGetter
         var query = HttpUtility.ParseQueryString(uriBuilder.Query);
 
         if (!string.IsNullOrEmpty(tipoHabitacion))
-            query["tipo_habitacion"] = tipoHabitacion;
+            query["tipo_habitacion"] = Uri.EscapeDataString(tipoHabitacion);
 
         if (fechaInicio.HasValue)
             query["date_from"] = fechaInicio.ToString();

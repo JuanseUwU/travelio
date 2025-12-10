@@ -5,38 +5,46 @@ using System.Text;
 
 namespace TravelioREST.Autos;
 
-public sealed class ClientRequest
+public class NuevoClienteRequest
 {
-    public int? BookingUserId { get; set; }
-    public required string Nombre { get; set; }
-    public required string Apellido { get; set; }
-    public required string Email { get; set; }
-    public string? Telefono { get; set; }
-    public string? Pais { get; set; }
+    public string Nombre { get; set; }
+    public string Apellido { get; set; }
+    public string Email { get; set; }
+    public string Telefono { get; set; }
+    public string Pais { get; set; }
 }
 
-public sealed class NuevoClienteResponse
+public class NuevoClienteResponse
 {
     public int IdUsuario { get; set; }
-    public required string Nombre { get; set; }
-    public required string Email { get; set; }
-    public required string Estado { get; set; }
-    public required Link[] _links { get; set; }
+    public string BookingUserId { get; set; }
+    public string Nombre { get; set; }
+    public string Email { get; set; }
+    public string Telefono { get; set; }
+    public string Pais { get; set; }
+    public string Estado { get; set; }
+    public _LinksNuevoClienteResponse[] _links { get; set; }
 }
+
+public class _LinksNuevoClienteResponse
+{
+    public string Rel { get; set; }
+    public string Href { get; set; }
+    public string Method { get; set; }
+}
+
 
 public static class ExternalClientCreator
 {
     public static async Task<NuevoClienteResponse> CrearClienteExternoAsync(string url,
-        int? bookingUserId,
         string nombre,
         string apellido,
         string email,
         string? telefono,
         string? pais)
     {
-        var request = new ClientRequest()
+        var request = new NuevoClienteRequest()
         {
-            BookingUserId = bookingUserId,
             Nombre = nombre,
             Apellido = apellido,
             Email = email,
@@ -44,6 +52,7 @@ public static class ExternalClientCreator
             Pais = pais
         };
         var response = await Global.CachedHttpClient.PostAsJsonAsync(url, request);
+        response.EnsureSuccessStatusCode();
         var cliente = await response.Content.ReadFromJsonAsync<NuevoClienteResponse>();
         return cliente ?? throw new InvalidOperationException("No se pudo crear el cliente externo.");
     }

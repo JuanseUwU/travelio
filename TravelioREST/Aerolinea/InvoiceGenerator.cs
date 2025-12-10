@@ -37,21 +37,23 @@ public static class InvoiceGenerator
         decimal total,
         (string nombre, string documento, string correo) cliente)
     {
-        var facturaRequest = new FacturaRequest
-        {
-            ReservaId = reservaId,
-            Subtotal = subtotal,
-            Iva = iva,
-            Total = total,
-            Cliente = new Cliente
-            {
-                Nombre = cliente.nombre,
-                Documento = cliente.documento,
-                Correo = cliente.correo
-            }
-        };
-        var response = await Global.CachedHttpClient.PostAsJsonAsync(url, facturaRequest);
-        var facturaResponse = await response.Content.ReadFromJsonAsync<FacturaResponse>();
-        return facturaResponse ?? throw new InvalidOperationException();
+        throw new NotImplementedException("La generación de facturas ha sido deshabilitada temporalmente.");
+
+        //var facturaRequest = new FacturaRequest
+        //{
+        //    ReservaId = reservaId,
+        //    Subtotal = subtotal,
+        //    Iva = iva,
+        //    Total = total,
+        //    Cliente = new Cliente
+        //    {
+        //        Nombre = cliente.nombre,
+        //        Documento = cliente.documento,
+        //        Correo = cliente.correo
+        //    }
+        //};
+        //var response = await Global.CachedHttpClient.PostAsJsonAsync(url, facturaRequest);
+        //var facturaResponse = await response.Content.ReadFromJsonAsync<FacturaResponse>();
+        //return facturaResponse ?? throw new InvalidOperationException();
     }
 }

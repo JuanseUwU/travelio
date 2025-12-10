@@ -1,3 +1,5 @@
+using TravelioDatabaseConnector.Enums;
+
 namespace TravelioIntegrator.Models;
 
 public record struct UserCreateRequest(
@@ -9,4 +11,5 @@ public record struct UserCreateRequest(
     string DocumentoIdentidad,
     string PasswordPlano,
     string? Pais = null,
-    string? Telefono = null);
+    string? Telefono = null,
+    RolUsuario? Rol = null);

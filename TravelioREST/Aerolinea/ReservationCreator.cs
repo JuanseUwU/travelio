@@ -39,20 +39,22 @@ public static class ReservationCreator
         string correo,
         (string nombre, string apellido, string tipoIdentificacion, string identificacion)[] pasajeros)
     {
-        var reserva = new ReservaRequest
-        {
-            idVuelo = idVuelo,
-            holdId = holdId,
-            correo = correo,
-            pasajeros = Array.ConvertAll(pasajeros, p => new Pasajero
-            {
-                nombre = p.nombre,
-                apellido = p.apellido,
-                identificacion = p.identificacion
-            })
-        };
-        var response = await Global.CachedHttpClient.PostAsJsonAsync(url, reserva);
-        var reservaResponse = await response.Content.ReadFromJsonAsync<ReservaResponse>();
-        return reservaResponse ?? throw new InvalidOperationException();
+        throw new NotImplementedException("La creación de reservas ha sido deshabilitada temporalmente.");
+
+        //var reserva = new ReservaRequest
+        //{
+        //    idVuelo = idVuelo,
+        //    holdId = holdId,
+        //    correo = correo,
+        //    pasajeros = Array.ConvertAll(pasajeros, p => new Pasajero
+        //    {
+        //        nombre = p.nombre,
+        //        apellido = p.apellido,
+        //        identificacion = p.identificacion
+        //    })
+        //};
+        //var response = await Global.CachedHttpClient.PostAsJsonAsync(url, reserva);
+        //var reservaResponse = await response.Content.ReadFromJsonAsync<ReservaResponse>();
+        //return reservaResponse ?? throw new InvalidOperationException();
     }
 }

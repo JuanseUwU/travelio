@@ -7,17 +7,24 @@ namespace TravelioREST.Aerolinea;
 
 public class ClienteRequestData
 {
-    public required string nombre { get; set; }
-    public required string apellido { get; set; }
-    public required string correo { get; set; }
+    public string Nombre { get; set; }
+    public string Apellido { get; set; }
+    public string Correo { get; set; }
 }
 
 public class ClienteResponse
 {
     public int IdUsuario { get; set; }
-    public required string NombreCompleto { get; set; }
-    public required string Email { get; set; }
+    public string NombreCompleto { get; set; }
+    public string Email { get; set; }
+    public _LinksClienteCreator _links { get; set; }
 }
+
+public class _LinksClienteCreator
+{
+    public string self { get; set; }
+}
+
 
 public static class ExternalClientCreator
 {
@@ -25,9 +32,9 @@ public static class ExternalClientCreator
     {
         var request = new ClienteRequestData
         {
-            nombre = nombre,
-            apellido = apellido,
-            correo = correo
+            Nombre = nombre,
+            Apellido = apellido,
+            Correo = correo
         };
         var response = await Global.CachedHttpClient.PostAsJsonAsync(url, request);
         var client = await response.Content.ReadFromJsonAsync<ClienteResponse>();

@@ -58,6 +58,11 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
             builder.Property(c => c.DocumentoIdentidad).IsRequired().HasMaxLength(120);
             builder.Property(c => c.PasswordHash).IsRequired().HasMaxLength(256);
             builder.Property(c => c.PasswordSalt).IsRequired().HasMaxLength(256);
+            builder.Property(c => c.Rol)
+                .HasConversion<string>()
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue(RolUsuario.Cliente);
         });
     }
 
@@ -83,6 +88,11 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
             builder.HasKey(r => r.Id);
             builder.Property(r => r.CodigoReserva).IsRequired().HasMaxLength(120);
             builder.Property(r => r.FacturaUrl).HasMaxLength(1024);
+            builder.Property(r => r.Activa)
+                .IsRequired()
+                .HasDefaultValue(true);
+            builder.Property(r => r.ValorPagadoNegocio).HasPrecision(18, 2);
+            builder.Property(r => r.ComisionAgencia).HasPrecision(18, 2);
             builder.HasOne(r => r.Servicio)
                 .WithMany(s => s.Reservas)
                 .HasForeignKey(r => r.ServicioId)
@@ -132,6 +142,7 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
             builder.Property(d => d.CrearReservaEndpoint).HasMaxLength(512);
             builder.Property(d => d.GenerarFacturaEndpoint).HasMaxLength(512);
             builder.Property(d => d.ObtenerReservaEndpoint).HasMaxLength(512);
+            builder.Property(d => d.CancelarReservaEndpoint).HasMaxLength(512);
             builder.Property(d => d.TipoProtocolo)
                 .HasConversion<string>()
                 .IsRequired()
@@ -717,7 +728,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva" // Estas (API de Aerolínea) se obtienen añadiendo ?idReserva={el número consultado} al final el endpoint, como http://skyandes.runasp.net/api/integracion/aerolinea/reserva?idReserva=1
+                ObtenerReservaEndpoint = "/reserva", // Estas (API de Aerolínea) se obtienen añadiendo ?idReserva={el número consultado} al final el endpoint, como http://skyandes.runasp.net/api/integracion/aerolinea/reserva?idReserva=1
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -750,7 +762,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                ObtenerReservaEndpoint = "/reserva",
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -783,7 +796,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                ObtenerReservaEndpoint = "/reserva",
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -816,7 +830,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                ObtenerReservaEndpoint = "/reserva",
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -851,7 +866,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                ObtenerReservaEndpoint = "/reserva",
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -886,7 +902,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva" // Estas (API de Habitaciones de hotel) se obtienen añadiendo ?idReserva={el número consultado} al final el endpoint, como http://hotelcampestrerest.runasp.net/api/v1/hoteles/reserva?idReserva=1
+                ObtenerReservaEndpoint = "/reserva", // Estas (API de Habitaciones de hotel) se obtienen añadiendo ?idReserva={el número consultado} al final el endpoint, como http://hotelcampestrerest.runasp.net/api/v1/hoteles/reserva?idReserva=1
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -919,7 +936,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                ObtenerReservaEndpoint = "/reserva",
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -952,7 +970,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                ObtenerReservaEndpoint = "/reserva",
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -985,7 +1004,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                ObtenerReservaEndpoint = "/reserva",
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -1018,7 +1038,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                ObtenerReservaEndpoint = "/reserva",
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -1051,7 +1072,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                ObtenerReservaEndpoint = "/reserva",
+                CancelarReservaEndpoint = "/cancel"
             },
 
 
@@ -1079,14 +1101,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 701,
                 ServicioId = 201,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://cuencautosinte.runasp.net/api/v1/integracion/autos",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva" // Estas (API de Renta de Autos) se obtienen añadiendo el número consultado al final el endpoint, como http://cuencautosinte.runasp.net/api/v1/integracion/autos/reservas/1
+                UriBase = "http://cuencautosinte.runasp.net/api/v1",
+                ObtenerProductosEndpoint = "/integracion/autos/search",
+                RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
+                ConfirmarProductoEndpoint = "/integracion/autos/availability",
+                CrearPrerreservaEndpoint = "/integracion/autos/hold",
+                CrearReservaEndpoint = "/integracion/autos/book",
+                GenerarFacturaEndpoint = "/integracion/autos/invoices",
+                ObtenerReservaEndpoint = "/integracion/autos/reserva", // Estas (API de Renta de Autos) se obtienen añadiendo el número consultado al final el endpoint, como http://cuencautosinte.runasp.net/api/v1/integracion/autos/reservas/1
+                CancelarReservaEndpoint = "/CancelarAuto"
             },
 
 
@@ -1112,14 +1135,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 702,
                 ServicioId = 202,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://restintegracin.runasp.net/api/v1/integracion/autos",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                UriBase = "http://restintegracin.runasp.net/api/v1",
+                ObtenerProductosEndpoint = "/integracion/autos/search",
+                RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
+                ConfirmarProductoEndpoint = "/integracion/autos/availability",
+                CrearPrerreservaEndpoint = "/integracion/autos/hold",
+                CrearReservaEndpoint = "/integracion/autos/book",
+                GenerarFacturaEndpoint = "/integracion/autos/invoices",
+                ObtenerReservaEndpoint = "/integracion/autos/reserva",
+                CancelarReservaEndpoint = "/CancelarAuto"
             },
 
 
@@ -1145,14 +1169,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 703,
                 ServicioId = 203,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://integracionrest.runasp.net/api/v1/integracion/autos",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                UriBase = "http://integracionrest.runasp.net/api/v1",
+                ObtenerProductosEndpoint = "/integracion/autos/search",
+                RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
+                ConfirmarProductoEndpoint = "/integracion/autos/availability",
+                CrearPrerreservaEndpoint = "/integracion/autos/hold",
+                CrearReservaEndpoint = "/integracion/autos/book",
+                GenerarFacturaEndpoint = "/integracion/autos/invoices",
+                ObtenerReservaEndpoint = "/integracion/autos/reserva",
+                CancelarReservaEndpoint = "/CancelarAuto"
             },
 
 
@@ -1178,14 +1203,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 704,
                 ServicioId = 204,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://autocarent.runasp.net/api/v1/integracion/autos",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva"
+                UriBase = "http://autocarent.runasp.net/api/v1",
+                ObtenerProductosEndpoint = "/integracion/autos/search",
+                RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
+                ConfirmarProductoEndpoint = "/integracion/autos/availability",
+                CrearPrerreservaEndpoint = "/integracion/autos/hold",
+                CrearReservaEndpoint = "/integracion/autos/book",
+                GenerarFacturaEndpoint = "/integracion/autos/invoices",
+                ObtenerReservaEndpoint = "/integracion/autos/reserva",
+                CancelarReservaEndpoint = "/CancelarAuto"
             },
 
 
@@ -1218,7 +1244,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/v1/integracion/autos/hold",
                 CrearReservaEndpoint = "/v1/integracion/autos/book",
                 GenerarFacturaEndpoint = "/v1/integracion/autos/invoices",
-                ObtenerReservaEndpoint = "/v2/prereserva/auto"
+                ObtenerReservaEndpoint = "/v2/prereserva/auto",
+                CancelarReservaEndpoint = "v1/CancelarAuto"
             },
 
 
@@ -1251,7 +1278,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/integracion/autos/hold",
                 CrearReservaEndpoint = "/integracion/autos/book",
                 GenerarFacturaEndpoint = "/integracion/autos/invoices",
-                ObtenerReservaEndpoint = "/prereserva/auto"
+                ObtenerReservaEndpoint = "/prereserva/auto",
+                CancelarReservaEndpoint = "/CancelarAuto"
             },
 
 
@@ -1286,7 +1314,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/pre-reserva",
                 CrearReservaEndpoint = "/reserva",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/{id}/reserva" // Estas (API de Paquetes turísticos) se obtienen reemplazando {id} por el ID de reserva en el enlace, como https://worldagencybk.runasp.net/api/v2/paquetes/1/reserva
+                ObtenerReservaEndpoint = "/{id}/reserva", // Estas (API de Paquetes turísticos) se obtienen reemplazando {id} por el ID de reserva en el enlace, como https://worldagencybk.runasp.net/api/v2/paquetes/1/reserva
+                CancelarReservaEndpoint = "/cancelar"
             },
 
 
@@ -1320,7 +1349,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/pre-reserva",
                 CrearReservaEndpoint = "/reserva",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/{id}/reserva"
+                ObtenerReservaEndpoint = "/{id}/reserva",
+                CancelarReservaEndpoint = "/cancelar"
             },
 
 
@@ -1354,7 +1384,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/pre-reserva",
                 CrearReservaEndpoint = "/reserva",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/{id}/reserva"
+                ObtenerReservaEndpoint = "/{id}/reserva",
+                CancelarReservaEndpoint = "/cancelar"
             },
 
 
@@ -1389,7 +1420,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reservas" // Estas (API de Mesas) se obtienen añadiendo el número consultado al final el endpoint, como http://cangrejitosfelices.runasp.net/api/v1/integracion/restaurantes/reservas/9
+                ObtenerReservaEndpoint = "/reservas", // Estas (API de Mesas) se obtienen añadiendo el número consultado al final el endpoint, como http://cangrejitosfelices.runasp.net/api/v1/integracion/restaurantes/reservas/9
+                CancelarReservaEndpoint = "/cancelar"
             },
 
 
@@ -1422,7 +1454,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reservas"
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/cancelar"
             },
 
 
@@ -1455,7 +1488,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reservas"
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/cancelar"
             },
 
 
@@ -1488,7 +1522,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reservas"
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/cancelar"
             },
 
 
@@ -1521,7 +1556,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reservas"
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/cancelar"
             },
 
 
@@ -1554,7 +1590,8 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reservas"
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/cancelar"
             },
 
 
@@ -1587,9 +1624,17 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 CrearPrerreservaEndpoint = "/hold",
                 CrearReservaEndpoint = "/book",
                 GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reservas"
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/cancelar"
             },
         };
+
+        //foreach (var detalle in detalles)
+        //{
+        //    detalle.CancelarReservaEndpoint = detalle.TipoProtocolo == TipoProtocolo.Rest
+        //        ? "/cancel"
+        //        : null;
+        //}
 
         modelBuilder.Entity<DetalleServicio>().HasData(detalles);
     }

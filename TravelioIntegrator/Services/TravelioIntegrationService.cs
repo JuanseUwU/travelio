@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Data;
 using TravelioAPIConnector.Aerolinea;
 using TravelioAPIConnector.Autos;
 using TravelioAPIConnector.Habitaciones;
 using TravelioAPIConnector.Mesas;
 using TravelioAPIConnector.Paquetes;
+using static TravelioAPIConnector.Global;
 using TravelioBankConnector;
 using TravelioDatabaseConnector.Data;
 using TravelioDatabaseConnector.Enums;
@@ -53,6 +55,22 @@ public class TravelioIntegrationService
         return $"{detalle.UriBase.TrimEnd('/')}{endpoint}";
     }
 
+    private static IEnumerable<DetalleServicio> FiltrarDetallesPorProtocolo(IEnumerable<DetalleServicio> detalles, bool preferRest)
+    {
+        var protocoloPreferido = preferRest ? TipoProtocolo.Rest : TipoProtocolo.Soap;
+        var seleccion = detalles.Where(d => d.TipoProtocolo == protocoloPreferido).ToList();
+        return seleccion.Count > 0 ? seleccion : detalles;
+    }
+
+    private static (DetalleServicio? preferido, DetalleServicio? alternativo) SeleccionarDetalle(IEnumerable<DetalleServicio> detalles, bool preferRest)
+    {
+        var rest = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest);
+        var soap = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Soap);
+        var preferido = preferRest ? rest ?? soap : soap ?? rest;
+        var alternativo = preferRest ? soap : rest;
+        return (preferido, alternativo);
+    }
+
     #region Usuarios
 
     public async Task<Cliente?> CrearUsuarioAsync(UserCreateRequest request, ILogger? logger = null)
@@ -76,7 +94,8 @@ public class TravelioIntegrationService
                 FechaNacimiento = request.FechaNacimiento,
                 Telefono = request.Telefono,
                 TipoIdentificacion = request.TipoIdentificacion,
-                DocumentoIdentidad = request.DocumentoIdentidad
+                DocumentoIdentidad = request.DocumentoIdentidad,
+                Rol = request.Rol ?? RolUsuario.Cliente
             };
 
             log.LogTrace("Creando usuario con datos: {Correo} {Nombre} {Apellido} {PasswordPlano}", request.Correo, request.Nombre, request.Apellido, request.PasswordPlano);
@@ -123,6 +142,25 @@ public class TravelioIntegrationService
     public Cliente? IniciarSesion(string correo, string passwordPlano, ILogger? logger = null) =>
         IniciarSesionAsync(correo, passwordPlano, logger).GetAwaiter().GetResult();
 
+    public async Task<bool?> EsAdministradorAsync(int clienteId, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var cliente = await _db.Clientes.FirstOrDefaultAsync(c => c.Id == clienteId);
+            if (cliente is null) return null;
+            return cliente.Rol == RolUsuario.Administrador;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al verificar rol de administrador para cliente {ClienteId}", clienteId);
+            return null;
+        }
+    }
+
+    public bool? EsAdministrador(int clienteId, ILogger? logger = null) =>
+        EsAdministradorAsync(clienteId, logger).GetAwaiter().GetResult();
+
     #endregion
 
     #region Búsqueda de productos
@@ -136,23 +174,51 @@ public class TravelioIntegrationService
                 .Where(d => d.Servicio.TipoServicio == TipoServicio.Aerolinea)
                 .ToListAsync();
 
+            var preferRest = IsREST;
+            var detallesFiltrados = FiltrarDetallesPorProtocolo(detalles, preferRest).ToList();
+
             var resultados = new List<ProductoServicio<Vuelo>>();
-            foreach (var det in detalles)
+            foreach (var det in detallesFiltrados)
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+                var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
                 log.LogDebug("Buscando vuelos en {Uri} con filtros {@Filtros}", uri, filtros);
-                var vuelos = await AerolineaConnector.GetVuelosAsync(
-                    uri!,
-                    filtros.Origen,
-                    filtros.Destino,
-                    filtros.FechaDespegue,
-                    filtros.FechaLlegada,
-                    filtros.TipoCabina,
-                    filtros.Pasajeros,
-                    filtros.PrecioMin,
-                    filtros.PrecioMax);
+                try
+                {
+                    var vuelos = await AerolineaConnector.GetVuelosAsync(
+                        uri!,
+                        filtros.Origen,
+                        filtros.Destino,
+                        filtros.FechaDespegue,
+                        filtros.FechaLlegada,
+                        filtros.TipoCabina,
+                        filtros.Pasajeros,
+                        filtros.PrecioMin,
+                        filtros.PrecioMax,
+                        forceSoap);
 
-                resultados.AddRange(vuelos.Select(v => new ProductoServicio<Vuelo>(det.ServicioId, det.Servicio.Nombre, v)));
+                    resultados.AddRange(vuelos.Select(v => new ProductoServicio<Vuelo>(det.ServicioId, det.Servicio.Nombre, v)));
+                }
+                catch (NotImplementedException) when (preferRest)
+                {
+                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                    if (detSoap is null) throw;
+
+                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                    var vuelos = await AerolineaConnector.GetVuelosAsync(
+                        uriSoap!,
+                        filtros.Origen,
+                        filtros.Destino,
+                        filtros.FechaDespegue,
+                        filtros.FechaLlegada,
+                        filtros.TipoCabina,
+                        filtros.Pasajeros,
+                        filtros.PrecioMin,
+                        filtros.PrecioMax,
+                        true);
+
+                    resultados.AddRange(vuelos.Select(v => new ProductoServicio<Vuelo>(detSoap.ServicioId, detSoap.Servicio.Nombre, v)));
+                }
             }
 
             return resultados;
@@ -172,24 +238,49 @@ public class TravelioIntegrationService
         var log = ResolveLogger(logger);
         try
         {
-            var det = await _db.DetallesServicio.Include(d => d.Servicio)
-                .FirstOrDefaultAsync(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.Aerolinea);
+            var detalles = await _db.DetallesServicio.Include(d => d.Servicio)
+                .Where(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.Aerolinea)
+                .ToListAsync();
+
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
             if (det is null) return Array.Empty<ProductoServicio<Vuelo>>();
 
             var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
             log.LogDebug("Buscando vuelos en servicio {ServicioId} uri {Uri} con filtros {@Filtros}", servicioId, uri, filtros);
-            var vuelos = await AerolineaConnector.GetVuelosAsync(
-                uri!,
-                filtros.Origen,
-                filtros.Destino,
-                filtros.FechaDespegue,
-                filtros.FechaLlegada,
-                filtros.TipoCabina,
-                filtros.Pasajeros,
-                filtros.PrecioMin,
-                filtros.PrecioMax);
+            try
+            {
+                var vuelos = await AerolineaConnector.GetVuelosAsync(
+                    uri!,
+                    filtros.Origen,
+                    filtros.Destino,
+                    filtros.FechaDespegue,
+                    filtros.FechaLlegada,
+                    filtros.TipoCabina,
+                    filtros.Pasajeros,
+                    filtros.PrecioMin,
+                    filtros.PrecioMax,
+                    forceSoap);
 
-            return vuelos.Select(v => new ProductoServicio<Vuelo>(det.ServicioId, det.Servicio.Nombre, v)).ToArray();
+                return vuelos.Select(v => new ProductoServicio<Vuelo>(det.ServicioId, det.Servicio.Nombre, v)).ToArray();
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ObtenerProductosEndpoint);
+                var vuelos = await AerolineaConnector.GetVuelosAsync(
+                    uriSoap!,
+                    filtros.Origen,
+                    filtros.Destino,
+                    filtros.FechaDespegue,
+                    filtros.FechaLlegada,
+                    filtros.TipoCabina,
+                    filtros.Pasajeros,
+                    filtros.PrecioMin,
+                    filtros.PrecioMax,
+                    true);
+
+                return vuelos.Select(v => new ProductoServicio<Vuelo>(alternativo.ServicioId, alternativo.Servicio.Nombre, v)).ToArray();
+            }
         }
         catch (Exception ex)
         {
@@ -210,23 +301,50 @@ public class TravelioIntegrationService
                 .Where(d => d.Servicio.TipoServicio == TipoServicio.RentaVehiculos)
                 .ToListAsync();
 
+            var preferRest = IsREST;
+            var detallesFiltrados = FiltrarDetallesPorProtocolo(detalles, preferRest).ToList();
             var resultados = new List<ProductoServicio<Vehiculo>>();
-            foreach (var det in detalles)
+            foreach (var det in detallesFiltrados)
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+                var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
                 log.LogDebug("Buscando autos en {Uri} con filtros {@Filtros}", uri, filtros);
-                var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
-                    uri!,
-                    filtros.Categoria,
-                    filtros.Transmision,
-                    filtros.Capacidad,
-                    filtros.PrecioMin,
-                    filtros.PrecioMax,
-                    filtros.Sort,
-                    filtros.Ciudad,
-                    filtros.Pais);
+                try
+                {
+                    var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
+                        uri!,
+                        filtros.Categoria,
+                        filtros.Transmision,
+                        filtros.Capacidad,
+                        filtros.PrecioMin,
+                        filtros.PrecioMax,
+                        filtros.Sort,
+                        filtros.Ciudad,
+                        filtros.Pais,
+                        forceSoap);
 
-                resultados.AddRange(autos.Select(a => new ProductoServicio<Vehiculo>(det.ServicioId, det.Servicio.Nombre, a)));
+                    resultados.AddRange(autos.Select(a => new ProductoServicio<Vehiculo>(det.ServicioId, det.Servicio.Nombre, a)));
+                }
+                catch (NotImplementedException) when (preferRest)
+                {
+                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                    if (detSoap is null) throw;
+
+                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                    var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
+                        uriSoap!,
+                        filtros.Categoria,
+                        filtros.Transmision,
+                        filtros.Capacidad,
+                        filtros.PrecioMin,
+                        filtros.PrecioMax,
+                        filtros.Sort,
+                        filtros.Ciudad,
+                        filtros.Pais,
+                        true);
+
+                    resultados.AddRange(autos.Select(a => new ProductoServicio<Vehiculo>(detSoap.ServicioId, detSoap.Servicio.Nombre, a)));
+                }
             }
 
             return resultados;
@@ -246,24 +364,48 @@ public class TravelioIntegrationService
         var log = ResolveLogger(logger);
         try
         {
-            var det = await _db.DetallesServicio.Include(d => d.Servicio)
-                .FirstOrDefaultAsync(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.RentaVehiculos);
+            var detalles = await _db.DetallesServicio.Include(d => d.Servicio)
+                .Where(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.RentaVehiculos)
+                .ToListAsync();
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
             if (det is null) return Array.Empty<ProductoServicio<Vehiculo>>();
 
             var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
             log.LogDebug("Buscando autos en servicio {ServicioId} uri {Uri} con filtros {@Filtros}", servicioId, uri, filtros);
-            var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
-                uri!,
-                filtros.Categoria,
-                filtros.Transmision,
-                filtros.Capacidad,
-                filtros.PrecioMin,
-                filtros.PrecioMax,
-                filtros.Sort,
-                filtros.Ciudad,
-                filtros.Pais);
+            try
+            {
+                var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
+                    uri!,
+                    filtros.Categoria,
+                    filtros.Transmision,
+                    filtros.Capacidad,
+                    filtros.PrecioMin,
+                    filtros.PrecioMax,
+                    filtros.Sort,
+                    filtros.Ciudad,
+                    filtros.Pais,
+                    forceSoap);
 
-            return autos.Select(a => new ProductoServicio<Vehiculo>(det.ServicioId, det.Servicio.Nombre, a)).ToArray();
+                return autos.Select(a => new ProductoServicio<Vehiculo>(det.ServicioId, det.Servicio.Nombre, a)).ToArray();
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ObtenerProductosEndpoint);
+                var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
+                    uriSoap!,
+                    filtros.Categoria,
+                    filtros.Transmision,
+                    filtros.Capacidad,
+                    filtros.PrecioMin,
+                    filtros.PrecioMax,
+                    filtros.Sort,
+                    filtros.Ciudad,
+                    filtros.Pais,
+                    true);
+
+                return autos.Select(a => new ProductoServicio<Vehiculo>(alternativo.ServicioId, alternativo.Servicio.Nombre, a)).ToArray();
+            }
         }
         catch (Exception ex)
         {
@@ -284,21 +426,46 @@ public class TravelioIntegrationService
                 .Where(d => d.Servicio.TipoServicio == TipoServicio.Hotel)
                 .ToListAsync();
 
+            var preferRest = IsREST;
+            var detallesFiltrados = FiltrarDetallesPorProtocolo(detalles, preferRest).ToList();
             var resultados = new List<ProductoServicio<Habitacion>>();
-            foreach (var det in detalles)
+            foreach (var det in detallesFiltrados)
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+                var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
                 log.LogDebug("Buscando habitaciones en {Uri} con filtros {@Filtros}", uri, filtros);
-                var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
-                    uri!,
-                    filtros.FechaInicio,
-                    filtros.FechaFin,
-                    filtros.TipoHabitacion,
-                    filtros.Capacidad,
-                    filtros.PrecioMin,
-                    filtros.PrecioMax);
+                try
+                {
+                    var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
+                        uri!,
+                        filtros.FechaInicio,
+                        filtros.FechaFin,
+                        filtros.TipoHabitacion,
+                        filtros.Capacidad,
+                        filtros.PrecioMin,
+                        filtros.PrecioMax,
+                        forceSoap);
 
-                resultados.AddRange(habitaciones.Select(h => new ProductoServicio<Habitacion>(det.ServicioId, det.Servicio.Nombre, h)));
+                    resultados.AddRange(habitaciones.Select(h => new ProductoServicio<Habitacion>(det.ServicioId, det.Servicio.Nombre, h)));
+                }
+                catch (NotImplementedException) when (preferRest)
+                {
+                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                    if (detSoap is null) throw;
+
+                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                    var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
+                        uriSoap!,
+                        filtros.FechaInicio,
+                        filtros.FechaFin,
+                        filtros.TipoHabitacion,
+                        filtros.Capacidad,
+                        filtros.PrecioMin,
+                        filtros.PrecioMax,
+                        true);
+
+                    resultados.AddRange(habitaciones.Select(h => new ProductoServicio<Habitacion>(detSoap.ServicioId, detSoap.Servicio.Nombre, h)));
+                }
             }
 
             return resultados;
@@ -318,22 +485,44 @@ public class TravelioIntegrationService
         var log = ResolveLogger(logger);
         try
         {
-            var det = await _db.DetallesServicio.Include(d => d.Servicio)
-                .FirstOrDefaultAsync(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.Hotel);
+            var detalles = await _db.DetallesServicio.Include(d => d.Servicio)
+                .Where(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.Hotel)
+                .ToListAsync();
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
             if (det is null) return Array.Empty<ProductoServicio<Habitacion>>();
 
             var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
             log.LogDebug("Buscando habitaciones en servicio {ServicioId} uri {Uri} con filtros {@Filtros}", servicioId, uri, filtros);
-            var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
-                uri!,
-                filtros.FechaInicio,
-                filtros.FechaFin,
-                filtros.TipoHabitacion,
-                filtros.Capacidad,
-                filtros.PrecioMin,
-                filtros.PrecioMax);
+            try
+            {
+                var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
+                    uri!,
+                    filtros.FechaInicio,
+                    filtros.FechaFin,
+                    filtros.TipoHabitacion,
+                    filtros.Capacidad,
+                    filtros.PrecioMin,
+                    filtros.PrecioMax,
+                    forceSoap);
 
-            return habitaciones.Select(h => new ProductoServicio<Habitacion>(det.ServicioId, det.Servicio.Nombre, h)).ToArray();
+                return habitaciones.Select(h => new ProductoServicio<Habitacion>(det.ServicioId, det.Servicio.Nombre, h)).ToArray();
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ObtenerProductosEndpoint);
+                var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
+                    uriSoap!,
+                    filtros.FechaInicio,
+                    filtros.FechaFin,
+                    filtros.TipoHabitacion,
+                    filtros.Capacidad,
+                    filtros.PrecioMin,
+                    filtros.PrecioMax,
+                    true);
+
+                return habitaciones.Select(h => new ProductoServicio<Habitacion>(alternativo.ServicioId, alternativo.Servicio.Nombre, h)).ToArray();
+            }
         }
         catch (Exception ex)
         {
@@ -354,19 +543,42 @@ public class TravelioIntegrationService
                 .Where(d => d.Servicio.TipoServicio == TipoServicio.PaquetesTuristicos)
                 .ToListAsync();
 
+            var preferRest = IsREST;
+            var detallesFiltrados = FiltrarDetallesPorProtocolo(detalles, preferRest).ToList();
             var resultados = new List<ProductoServicio<Paquete>>();
-            foreach (var det in detalles)
+            foreach (var det in detallesFiltrados)
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+                var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
                 log.LogDebug("Buscando paquetes en {Uri} con filtros {@Filtros}", uri, filtros);
-                var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
-                    uri!,
-                    filtros.Ciudad,
-                    filtros.FechaInicio,
-                    filtros.TipoActividad,
-                    filtros.PrecioMax);
+                try
+                {
+                    var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
+                        uri!,
+                        filtros.Ciudad,
+                        filtros.FechaInicio,
+                        filtros.TipoActividad,
+                        filtros.PrecioMax,
+                        forceSoap);
 
-                resultados.AddRange(paquetes.Select(p => new ProductoServicio<Paquete>(det.ServicioId, det.Servicio.Nombre, p)));
+                    resultados.AddRange(paquetes.Select(p => new ProductoServicio<Paquete>(det.ServicioId, det.Servicio.Nombre, p)));
+                }
+                catch (NotImplementedException) when (preferRest)
+                {
+                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                    if (detSoap is null) throw;
+
+                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                    var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
+                        uriSoap!,
+                        filtros.Ciudad,
+                        filtros.FechaInicio,
+                        filtros.TipoActividad,
+                        filtros.PrecioMax,
+                        true);
+
+                    resultados.AddRange(paquetes.Select(p => new ProductoServicio<Paquete>(detSoap.ServicioId, detSoap.Servicio.Nombre, p)));
+                }
             }
 
             return resultados;
@@ -386,20 +598,40 @@ public class TravelioIntegrationService
         var log = ResolveLogger(logger);
         try
         {
-            var det = await _db.DetallesServicio.Include(d => d.Servicio)
-                .FirstOrDefaultAsync(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.PaquetesTuristicos);
+            var detalles = await _db.DetallesServicio.Include(d => d.Servicio)
+                .Where(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.PaquetesTuristicos)
+                .ToListAsync();
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
             if (det is null) return Array.Empty<ProductoServicio<Paquete>>();
 
             var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
             log.LogDebug("Buscando paquetes en servicio {ServicioId} uri {Uri} con filtros {@Filtros}", servicioId, uri, filtros);
-            var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
-                uri!,
-                filtros.Ciudad,
-                filtros.FechaInicio,
-                filtros.TipoActividad,
-                filtros.PrecioMax);
+            try
+            {
+                var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
+                    uri!,
+                    filtros.Ciudad,
+                    filtros.FechaInicio,
+                    filtros.TipoActividad,
+                    filtros.PrecioMax,
+                    forceSoap);
 
-            return paquetes.Select(p => new ProductoServicio<Paquete>(det.ServicioId, det.Servicio.Nombre, p)).ToArray();
+                return paquetes.Select(p => new ProductoServicio<Paquete>(det.ServicioId, det.Servicio.Nombre, p)).ToArray();
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ObtenerProductosEndpoint);
+                var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
+                    uriSoap!,
+                    filtros.Ciudad,
+                    filtros.FechaInicio,
+                    filtros.TipoActividad,
+                    filtros.PrecioMax,
+                    true);
+
+                return paquetes.Select(p => new ProductoServicio<Paquete>(alternativo.ServicioId, alternativo.Servicio.Nombre, p)).ToArray();
+            }
         }
         catch (Exception ex)
         {
@@ -420,18 +652,40 @@ public class TravelioIntegrationService
                 .Where(d => d.Servicio.TipoServicio == TipoServicio.Restaurante)
                 .ToListAsync();
 
+            var preferRest = IsREST;
+            var detallesFiltrados = FiltrarDetallesPorProtocolo(detalles, preferRest).ToList();
             var resultados = new List<ProductoServicio<Mesa>>();
-            foreach (var det in detalles)
+            foreach (var det in detallesFiltrados)
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+                var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
                 log.LogDebug("Buscando mesas en {Uri} con filtros {@Filtros}", uri, filtros);
-                var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
-                    uri!,
-                    filtros.Capacidad,
-                    filtros.TipoMesa,
-                    filtros.Estado);
+                try
+                {
+                    var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
+                        uri!,
+                        filtros.Capacidad,
+                        filtros.TipoMesa,
+                        filtros.Estado,
+                        forceSoap);
 
-                resultados.AddRange(mesas.Select(m => new ProductoServicio<Mesa>(det.ServicioId, det.Servicio.Nombre, m)));
+                    resultados.AddRange(mesas.Select(m => new ProductoServicio<Mesa>(det.ServicioId, det.Servicio.Nombre, m)));
+                }
+                catch (NotImplementedException) when (preferRest)
+                {
+                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                    if (detSoap is null) throw;
+
+                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                    var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
+                        uriSoap!,
+                        filtros.Capacidad,
+                        filtros.TipoMesa,
+                        filtros.Estado,
+                        true);
+
+                    resultados.AddRange(mesas.Select(m => new ProductoServicio<Mesa>(detSoap.ServicioId, detSoap.Servicio.Nombre, m)));
+                }
             }
 
             return resultados;
@@ -451,19 +705,38 @@ public class TravelioIntegrationService
         var log = ResolveLogger(logger);
         try
         {
-            var det = await _db.DetallesServicio.Include(d => d.Servicio)
-                .FirstOrDefaultAsync(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.Restaurante);
+            var detalles = await _db.DetallesServicio.Include(d => d.Servicio)
+                .Where(d => d.ServicioId == servicioId && d.Servicio.TipoServicio == TipoServicio.Restaurante)
+                .ToListAsync();
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
             if (det is null) return Array.Empty<ProductoServicio<Mesa>>();
 
             var uri = BuildUri(det, det.ObtenerProductosEndpoint);
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
             log.LogDebug("Buscando mesas en servicio {ServicioId} uri {Uri} con filtros {@Filtros}", servicioId, uri, filtros);
-            var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
-                uri!,
-                filtros.Capacidad,
-                filtros.TipoMesa,
-                filtros.Estado);
+            try
+            {
+                var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
+                    uri!,
+                    filtros.Capacidad,
+                    filtros.TipoMesa,
+                    filtros.Estado,
+                    forceSoap);
 
-            return mesas.Select(m => new ProductoServicio<Mesa>(det.ServicioId, det.Servicio.Nombre, m)).ToArray();
+                return mesas.Select(m => new ProductoServicio<Mesa>(det.ServicioId, det.Servicio.Nombre, m)).ToArray();
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ObtenerProductosEndpoint);
+                var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
+                    uriSoap!,
+                    filtros.Capacidad,
+                    filtros.TipoMesa,
+                    filtros.Estado,
+                    true);
+
+                return mesas.Select(m => new ProductoServicio<Mesa>(alternativo.ServicioId, alternativo.Servicio.Nombre, m)).ToArray();
+            }
         }
         catch (Exception ex)
         {
@@ -849,51 +1122,110 @@ public class TravelioIntegrationService
                 case TipoServicio.Aerolinea:
                     var vuelo = await _db.CarritosAerolinea.Include(c => c.Servicio).ThenInclude(s => s.DetallesServicio)
                         .FirstOrDefaultAsync(c => c.Id == itemId);
-                    if (vuelo?.Servicio.DetallesServicio.FirstOrDefault() is null) return null;
+                    if (vuelo is null) return null;
                     {
-                        var uri = BuildUri(vuelo.Servicio.DetallesServicio.FirstOrDefault(), vuelo.Servicio.DetallesServicio.FirstOrDefault().ConfirmarProductoEndpoint);
-                        var disponible = await AerolineaConnector.VerificarDisponibilidadVueloAsync(uri!, vuelo.IdVueloProveedor, vuelo.CantidadPasajeros);
-                        return disponible;
+                        var (det, alternativo) = SeleccionarDetalle(vuelo.Servicio.DetallesServicio, IsREST);
+                        if (det is null) return null;
+                        var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+                        var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+                        try
+                        {
+                            var disponible = await AerolineaConnector.VerificarDisponibilidadVueloAsync(uri!, vuelo.IdVueloProveedor, vuelo.CantidadPasajeros, forceSoap);
+                            return disponible;
+                        }
+                        catch (NotImplementedException) when (IsREST && alternativo is not null)
+                        {
+                            var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                            return await AerolineaConnector.VerificarDisponibilidadVueloAsync(uriSoap!, vuelo.IdVueloProveedor, vuelo.CantidadPasajeros, true);
+                        }
                     }
                 case TipoServicio.Hotel:
                     var hab = await _db.CarritosHabitaciones.Include(c => c.Servicio).ThenInclude(s => s.DetallesServicio)
                         .FirstOrDefaultAsync(c => c.Id == itemId);
-                    if (hab?.Servicio.DetallesServicio.FirstOrDefault() is null) return null;
+                    if (hab is null) return null;
                     {
-                        var uri = BuildUri(hab.Servicio.DetallesServicio.FirstOrDefault(), hab.Servicio.DetallesServicio.FirstOrDefault().ConfirmarProductoEndpoint);
-                        var disponible = await TravelioAPIConnector.Habitaciones.Connector.ValidarDisponibilidadAsync(
-                            uri!, hab.IdHabitacionProveedor, hab.FechaInicio, hab.FechaFin);
-                        return disponible;
+                        var (det, alternativo) = SeleccionarDetalle(hab.Servicio.DetallesServicio, IsREST);
+                        if (det is null) return null;
+                        var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+                        var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+                        try
+                        {
+                            var disponible = await TravelioAPIConnector.Habitaciones.Connector.ValidarDisponibilidadAsync(
+                                uri!, hab.IdHabitacionProveedor, hab.FechaInicio, hab.FechaFin, forceSoap);
+                            return disponible;
+                        }
+                        catch (NotImplementedException) when (IsREST && alternativo is not null)
+                        {
+                            var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                            return await TravelioAPIConnector.Habitaciones.Connector.ValidarDisponibilidadAsync(
+                                uriSoap!, hab.IdHabitacionProveedor, hab.FechaInicio, hab.FechaFin, true);
+                        }
                     }
                 case TipoServicio.RentaVehiculos:
                     var auto = await _db.CarritosAutos.Include(c => c.Servicio).ThenInclude(s => s.DetallesServicio)
                         .FirstOrDefaultAsync(c => c.Id == itemId);
-                    if (auto?.Servicio.DetallesServicio.FirstOrDefault() is null) return null;
+                    if (auto is null) return null;
                     {
-                        var uri = BuildUri(auto.Servicio.DetallesServicio.FirstOrDefault(), auto.Servicio.DetallesServicio.FirstOrDefault().ConfirmarProductoEndpoint);
-                        var disponible = await TravelioAPIConnector.Autos.Connector.VerificarDisponibilidadAutoAsync(
-                            uri!, auto.IdAutoProveedor, auto.FechaInicio, auto.FechaFin);
-                        return disponible;
+                        var (det, alternativo) = SeleccionarDetalle(auto.Servicio.DetallesServicio, IsREST);
+                        if (det is null) return null;
+                        var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+                        var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+                        try
+                        {
+                            var disponible = await TravelioAPIConnector.Autos.Connector.VerificarDisponibilidadAutoAsync(
+                                uri!, auto.IdAutoProveedor, auto.FechaInicio, auto.FechaFin, forceSoap);
+                            return disponible;
+                        }
+                        catch (NotImplementedException) when (IsREST && alternativo is not null)
+                        {
+                            var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                            return await TravelioAPIConnector.Autos.Connector.VerificarDisponibilidadAutoAsync(
+                                uriSoap!, auto.IdAutoProveedor, auto.FechaInicio, auto.FechaFin, true);
+                        }
                     }
                 case TipoServicio.PaquetesTuristicos:
                     var paq = await _db.CarritosPaquetes.Include(c => c.Servicio).ThenInclude(s => s.DetallesServicio)
                         .FirstOrDefaultAsync(c => c.Id == itemId);
-                    if (paq?.Servicio.DetallesServicio.FirstOrDefault() is null) return null;
+                    if (paq is null) return null;
                     {
-                        var uri = BuildUri(paq.Servicio.DetallesServicio.FirstOrDefault(), paq.Servicio.DetallesServicio.FirstOrDefault().ConfirmarProductoEndpoint);
-                        var disponible = await TravelioAPIConnector.Paquetes.Connector.ValidarDisponibilidadAsync(
-                            uri!, paq.IdPaqueteProveedor, paq.FechaInicio, paq.Personas);
-                        return disponible;
+                        var (det, alternativo) = SeleccionarDetalle(paq.Servicio.DetallesServicio, IsREST);
+                        if (det is null) return null;
+                        var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+                        var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+                        try
+                        {
+                            var disponible = await TravelioAPIConnector.Paquetes.Connector.ValidarDisponibilidadAsync(
+                                uri!, paq.IdPaqueteProveedor, paq.FechaInicio, paq.Personas, forceSoap);
+                            return disponible;
+                        }
+                        catch (NotImplementedException) when (IsREST && alternativo is not null)
+                        {
+                            var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                            return await TravelioAPIConnector.Paquetes.Connector.ValidarDisponibilidadAsync(
+                                uriSoap!, paq.IdPaqueteProveedor, paq.FechaInicio, paq.Personas, true);
+                        }
                     }
                 case TipoServicio.Restaurante:
                     var mesa = await _db.CarritosMesas.Include(c => c.Servicio).ThenInclude(s => s.DetallesServicio)
                         .FirstOrDefaultAsync(c => c.Id == itemId);
-                    if (mesa?.Servicio.DetallesServicio.FirstOrDefault() is null) return null;
+                    if (mesa is null) return null;
                     {
-                        var uri = BuildUri(mesa.Servicio.DetallesServicio.FirstOrDefault(), mesa.Servicio.DetallesServicio.FirstOrDefault().ConfirmarProductoEndpoint);
-                        var disponible = await TravelioAPIConnector.Mesas.Connector.ValidarDisponibilidadAsync(
-                            uri!, mesa.IdMesa, mesa.FechaReserva, mesa.NumeroPersonas);
-                        return disponible;
+                        var (det, alternativo) = SeleccionarDetalle(mesa.Servicio.DetallesServicio, IsREST);
+                        if (det is null) return null;
+                        var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+                        var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+                        try
+                        {
+                            var disponible = await TravelioAPIConnector.Mesas.Connector.ValidarDisponibilidadAsync(
+                                uri!, mesa.IdMesa, mesa.FechaReserva, mesa.NumeroPersonas, forceSoap);
+                            return disponible;
+                        }
+                        catch (NotImplementedException) when (IsREST && alternativo is not null)
+                        {
+                            var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                            return await TravelioAPIConnector.Mesas.Connector.ValidarDisponibilidadAsync(
+                                uriSoap!, mesa.IdMesa, mesa.FechaReserva, mesa.NumeroPersonas, true);
+                        }
                     }
                 default:
                     return null;
@@ -922,12 +1254,22 @@ public class TravelioIntegrationService
                 .ToListAsync();
             foreach (var item in vuelos)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
 
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var uriDisponibilidad = BuildUri(det, det.ConfirmarProductoEndpoint);
                 log.LogDebug("Verificando disponibilidad vuelo {IdVuelo} en {Uri}", item.IdVueloProveedor, uriDisponibilidad);
-                var disponible = await AerolineaConnector.VerificarDisponibilidadVueloAsync(uriDisponibilidad!, item.IdVueloProveedor, item.CantidadPasajeros);
+                bool disponible;
+                try
+                {
+                    disponible = await AerolineaConnector.VerificarDisponibilidadVueloAsync(uriDisponibilidad!, item.IdVueloProveedor, item.CantidadPasajeros, forceSoap);
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriDispSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                    disponible = await AerolineaConnector.VerificarDisponibilidadVueloAsync(uriDispSoap!, item.IdVueloProveedor, item.CantidadPasajeros, true);
+                }
                 if (!disponible)
                 {
                     log.LogError("Vuelo no disponible {IdVuelo}", item.IdVueloProveedor);
@@ -939,7 +1281,15 @@ public class TravelioIntegrationService
                 log.LogDebug("Creando hold de vuelo en {Uri} por {Segundos} segundos", uriHold, duracionHoldSegundos);
                 try
                 {
-                    var hold = await AerolineaConnector.CrearPrerreservaVueloAsync(uriHold!, item.IdVueloProveedor, pasajeros, duracionHoldSegundos);
+                    var hold = await AerolineaConnector.CrearPrerreservaVueloAsync(uriHold!, item.IdVueloProveedor, pasajeros, duracionHoldSegundos, forceSoap);
+                    item.HoldId = hold.holdId;
+                    item.HoldExpira = hold.expira;
+                    created = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriHoldSoap = BuildUri(alternativo, alternativo.CrearPrerreservaEndpoint);
+                    var hold = await AerolineaConnector.CrearPrerreservaVueloAsync(uriHoldSoap!, item.IdVueloProveedor, pasajeros, duracionHoldSegundos, true);
                     item.HoldId = hold.holdId;
                     item.HoldExpira = hold.expira;
                     created = true;
@@ -956,10 +1306,21 @@ public class TravelioIntegrationService
                 .ToListAsync();
             foreach (var item in habitaciones)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var uriDisp = BuildUri(det, det.ConfirmarProductoEndpoint);
-                var disponible = await TravelioAPIConnector.Habitaciones.Connector.ValidarDisponibilidadAsync(uriDisp!, item.IdHabitacionProveedor, item.FechaInicio, item.FechaFin);
+                bool disponible;
+                try
+                {
+                    disponible = await TravelioAPIConnector.Habitaciones.Connector.ValidarDisponibilidadAsync(uriDisp!, item.IdHabitacionProveedor, item.FechaInicio, item.FechaFin, forceSoap);
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriDispSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                    disponible = await TravelioAPIConnector.Habitaciones.Connector.ValidarDisponibilidadAsync(
+                        uriDispSoap!, item.IdHabitacionProveedor, item.FechaInicio, item.FechaFin, true);
+                }
                 if (!disponible)
                 {
                     log.LogError("Habitación no disponible {Id}", item.IdHabitacionProveedor);
@@ -971,7 +1332,16 @@ public class TravelioIntegrationService
                 try
                 {
                     var holdId = await TravelioAPIConnector.Habitaciones.Connector.CrearPrerreservaAsync(
-                        uriHold!, item.IdHabitacionProveedor, item.FechaInicio, item.FechaFin, item.NumeroHuespedes, duracionHoldSegundos, item.PrecioActual);
+                        uriHold!, item.IdHabitacionProveedor, item.FechaInicio, item.FechaFin, item.NumeroHuespedes, duracionHoldSegundos, item.PrecioActual, forceSoap);
+                    item.HoldId = holdId;
+                    item.HoldExpira = null;
+                    created = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriHoldSoap = BuildUri(alternativo, alternativo.CrearPrerreservaEndpoint);
+                    var holdId = await TravelioAPIConnector.Habitaciones.Connector.CrearPrerreservaAsync(
+                        uriHoldSoap!, item.IdHabitacionProveedor, item.FechaInicio, item.FechaFin, item.NumeroHuespedes, duracionHoldSegundos, item.PrecioActual, true);
                     item.HoldId = holdId;
                     item.HoldExpira = null;
                     created = true;
@@ -988,11 +1358,22 @@ public class TravelioIntegrationService
                 .ToListAsync();
             foreach (var item in autos)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var uriDisp = BuildUri(det, det.ConfirmarProductoEndpoint);
-                var disponible = await TravelioAPIConnector.Autos.Connector.VerificarDisponibilidadAutoAsync(
-                    uriDisp!, item.IdAutoProveedor, item.FechaInicio, item.FechaFin);
+                bool disponible;
+                try
+                {
+                    disponible = await TravelioAPIConnector.Autos.Connector.VerificarDisponibilidadAutoAsync(
+                        uriDisp!, item.IdAutoProveedor, item.FechaInicio, item.FechaFin, forceSoap);
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriDispSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                    disponible = await TravelioAPIConnector.Autos.Connector.VerificarDisponibilidadAutoAsync(
+                        uriDispSoap!, item.IdAutoProveedor, item.FechaInicio, item.FechaFin, true);
+                }
                 if (!disponible)
                 {
                     log.LogError("Auto no disponible {Id}", item.IdAutoProveedor);
@@ -1004,7 +1385,16 @@ public class TravelioIntegrationService
                 try
                 {
                     var hold = await TravelioAPIConnector.Autos.Connector.CrearPrerreservaAsync(
-                        uriHold!, item.IdAutoProveedor, item.FechaInicio, item.FechaFin, duracionHoldSegundos);
+                        uriHold!, item.IdAutoProveedor, item.FechaInicio, item.FechaFin, duracionHoldSegundos, forceSoap);
+                    item.HoldId = hold.holdId;
+                    item.HoldExpira = hold.holdExpiration;
+                    created = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriHoldSoap = BuildUri(alternativo, alternativo.CrearPrerreservaEndpoint);
+                    var hold = await TravelioAPIConnector.Autos.Connector.CrearPrerreservaAsync(
+                        uriHoldSoap!, item.IdAutoProveedor, item.FechaInicio, item.FechaFin, duracionHoldSegundos, true);
                     item.HoldId = hold.holdId;
                     item.HoldExpira = hold.holdExpiration;
                     created = true;
@@ -1022,11 +1412,22 @@ public class TravelioIntegrationService
                 .ToListAsync();
             foreach (var item in paquetes)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var uriDisp = BuildUri(det, det.ConfirmarProductoEndpoint);
-                var disponible = await TravelioAPIConnector.Paquetes.Connector.ValidarDisponibilidadAsync(
-                    uriDisp!, item.IdPaqueteProveedor, item.FechaInicio, item.Personas);
+                bool disponible;
+                try
+                {
+                    disponible = await TravelioAPIConnector.Paquetes.Connector.ValidarDisponibilidadAsync(
+                        uriDisp!, item.IdPaqueteProveedor, item.FechaInicio, item.Personas, forceSoap);
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriDispSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                    disponible = await TravelioAPIConnector.Paquetes.Connector.ValidarDisponibilidadAsync(
+                        uriDispSoap!, item.IdPaqueteProveedor, item.FechaInicio, item.Personas, true);
+                }
                 if (!disponible)
                 {
                     log.LogError("Paquete no disponible {Id}", item.IdPaqueteProveedor);
@@ -1038,7 +1439,16 @@ public class TravelioIntegrationService
                 try
                 {
                     var hold = await TravelioAPIConnector.Paquetes.Connector.CrearHoldAsync(
-                        uriHold!, item.IdPaqueteProveedor, item.BookingUserId, item.FechaInicio, item.Personas, duracionHoldSegundos);
+                        uriHold!, item.IdPaqueteProveedor, item.BookingUserId, item.FechaInicio, item.Personas, duracionHoldSegundos, forceSoap);
+                    item.HoldId = hold.holdId;
+                    item.HoldExpira = hold.expira;
+                    created = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriHoldSoap = BuildUri(alternativo, alternativo.CrearPrerreservaEndpoint);
+                    var hold = await TravelioAPIConnector.Paquetes.Connector.CrearHoldAsync(
+                        uriHoldSoap!, item.IdPaqueteProveedor, item.BookingUserId, item.FechaInicio, item.Personas, duracionHoldSegundos, true);
                     item.HoldId = hold.holdId;
                     item.HoldExpira = hold.expira;
                     created = true;
@@ -1055,11 +1465,22 @@ public class TravelioIntegrationService
                 .ToListAsync();
             foreach (var item in mesas)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var uriDisp = BuildUri(det, det.ConfirmarProductoEndpoint);
-                var disponible = await TravelioAPIConnector.Mesas.Connector.ValidarDisponibilidadAsync(
-                    uriDisp!, item.IdMesa, item.FechaReserva, item.NumeroPersonas);
+                bool disponible;
+                try
+                {
+                    disponible = await TravelioAPIConnector.Mesas.Connector.ValidarDisponibilidadAsync(
+                        uriDisp!, item.IdMesa, item.FechaReserva, item.NumeroPersonas, forceSoap);
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriDispSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                    disponible = await TravelioAPIConnector.Mesas.Connector.ValidarDisponibilidadAsync(
+                        uriDispSoap!, item.IdMesa, item.FechaReserva, item.NumeroPersonas, true);
+                }
                 if (!disponible)
                 {
                     log.LogError("Mesa no disponible {Id}", item.IdMesa);
@@ -1071,7 +1492,16 @@ public class TravelioIntegrationService
                 try
                 {
                     var hold = await TravelioAPIConnector.Mesas.Connector.CrearPreReservaAsync(
-                        uriHold!, item.IdMesa, item.FechaReserva, item.NumeroPersonas, duracionHoldSegundos);
+                        uriHold!, item.IdMesa, item.FechaReserva, item.NumeroPersonas, duracionHoldSegundos, forceSoap);
+                    item.HoldId = hold.holdId;
+                    item.HoldExpira = hold.expira;
+                    created = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriHoldSoap = BuildUri(alternativo, alternativo.CrearPrerreservaEndpoint);
+                    var hold = await TravelioAPIConnector.Mesas.Connector.CrearPreReservaAsync(
+                        uriHoldSoap!, item.IdMesa, item.FechaReserva, item.NumeroPersonas, duracionHoldSegundos, true);
                     item.HoldId = hold.holdId;
                     item.HoldExpira = hold.expira;
                     created = true;
@@ -1177,10 +1607,12 @@ public class TravelioIntegrationService
 
             foreach (var item in vuelos)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var monto = item.PrecioActual * item.CantidadPasajeros;
                 var montoNegocio = monto * 0.9m;
+                var comision = monto - montoNegocio;
 
                 if (!await PagarNegocioAsync(item.Servicio, montoNegocio))
                 {
@@ -1197,7 +1629,8 @@ public class TravelioIntegrationService
                         item.IdVueloProveedor,
                         item.HoldId ?? string.Empty,
                         cliente.CorreoElectronico,
-                        pasajeros);
+                        pasajeros,
+                        forceSoap);
 
                     var uriFactura = BuildUri(det, det.GenerarFacturaEndpoint);
                     string? facturaUrl = null;
@@ -1209,7 +1642,22 @@ public class TravelioIntegrationService
                             monto,
                             0m,
                             monto,
-                            (facturaInfo.NombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura));
+                            (facturaInfo.NombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura),
+                            string.Empty,
+                            forceSoap);
+                    }
+                    catch (NotImplementedException) when (IsREST && alternativo is not null)
+                    {
+                        var uriFacturaSoap = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                        facturaUrl = await AerolineaConnector.GenerarFacturaAsync(
+                            uriFacturaSoap!,
+                            reserva.idReserva,
+                            monto,
+                            0m,
+                            monto,
+                            (facturaInfo.NombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura),
+                            string.Empty,
+                            true);
                     }
                     catch (Exception invoiceEx)
                     {
@@ -1220,7 +1668,56 @@ public class TravelioIntegrationService
                     {
                         ServicioId = item.ServicioId,
                         CodigoReserva = reserva.codigoReserva,
-                        FacturaUrl = facturaUrl
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
+                    };
+                    _db.Reservas.Add(reservaDb);
+                    await _db.SaveChangesAsync();
+                    _db.ReservasCompra.Add(new ReservaCompra { CompraId = compra.Id, ReservaId = reservaDb.Id });
+
+                    _db.CarritosAerolinea.Remove(item);
+                    huboExito = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriReservaSoap = BuildUri(alternativo, alternativo.CrearReservaEndpoint);
+                    var reserva = await AerolineaConnector.CrearReservaAsync(
+                        uriReservaSoap!,
+                        item.IdVueloProveedor,
+                        item.HoldId ?? string.Empty,
+                        cliente.CorreoElectronico,
+                        pasajeros,
+                        true);
+
+                    var uriFactura = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                    string? facturaUrl = null;
+                    try
+                    {
+                        facturaUrl = await AerolineaConnector.GenerarFacturaAsync(
+                            uriFactura!,
+                            reserva.idReserva,
+                            monto,
+                            0m,
+                            monto,
+                            (facturaInfo.NombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura),
+                            string.Empty,
+                            true);
+                    }
+                    catch (Exception invoiceEx)
+                    {
+                        log.LogError(invoiceEx, "Error al generar factura de vuelo (fallback SOAP) {CarritoId}", item.Id);
+                    }
+
+                    var reservaDb = new DbReserva
+                    {
+                        ServicioId = item.ServicioId,
+                        CodigoReserva = reserva.codigoReserva,
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
                     };
                     _db.Reservas.Add(reservaDb);
                     await _db.SaveChangesAsync();
@@ -1239,11 +1736,13 @@ public class TravelioIntegrationService
 
             foreach (var item in habitaciones)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var noches = Math.Max(1, (decimal)(item.FechaFin.Date - item.FechaInicio.Date).TotalDays);
                 var monto = item.PrecioVigente * noches;
                 var montoNegocio = monto * 0.9m;
+                var comision = monto - montoNegocio;
 
                 if (!await PagarNegocioAsync(item.Servicio, montoNegocio))
                 {
@@ -1265,7 +1764,8 @@ public class TravelioIntegrationService
                         cliente.DocumentoIdentidad,
                         item.FechaInicio,
                         item.FechaFin,
-                        item.NumeroHuespedes);
+                        item.NumeroHuespedes,
+                        forceSoap);
 
                     var uriFactura = BuildUri(det, det.GenerarFacturaEndpoint);
                     string? facturaUrl = null;
@@ -1274,11 +1774,25 @@ public class TravelioIntegrationService
                         facturaUrl = await TravelioAPIConnector.Habitaciones.Connector.EmitirFacturaAsync(
                             uriFactura!,
                             reservaId,
+                        facturaInfo.NombreFactura,
+                        facturaInfo.Documento,
+                        facturaInfo.TipoDocumento,
+                        facturaInfo.Documento,
+                        facturaInfo.CorreoFactura,
+                        forceSoap);
+                    }
+                    catch (NotImplementedException) when (IsREST && alternativo is not null)
+                    {
+                        var uriFacturaSoap = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                        facturaUrl = await TravelioAPIConnector.Habitaciones.Connector.EmitirFacturaAsync(
+                            uriFacturaSoap!,
+                            reservaId,
                             facturaInfo.NombreFactura,
                             facturaInfo.Documento,
                             facturaInfo.TipoDocumento,
                             facturaInfo.Documento,
-                            facturaInfo.CorreoFactura);
+                            facturaInfo.CorreoFactura,
+                            true);
                     }
                     catch (Exception invoiceEx)
                     {
@@ -1289,7 +1803,61 @@ public class TravelioIntegrationService
                     {
                         ServicioId = item.ServicioId,
                         CodigoReserva = reservaId.ToString(),
-                        FacturaUrl = facturaUrl
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
+                    };
+                    _db.Reservas.Add(reservaDb);
+                    await _db.SaveChangesAsync();
+                    _db.ReservasCompra.Add(new ReservaCompra { CompraId = compra.Id, ReservaId = reservaDb.Id });
+                    _db.CarritosHabitaciones.Remove(item);
+                    huboExito = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriReservaSoap = BuildUri(alternativo, alternativo.CrearReservaEndpoint);
+                    var reservaId = await TravelioAPIConnector.Habitaciones.Connector.CrearReservaAsync(
+                        uriReservaSoap!,
+                        item.IdHabitacionProveedor,
+                        item.HoldId ?? string.Empty,
+                        cliente.Nombre,
+                        cliente.Apellido,
+                        cliente.CorreoElectronico,
+                        cliente.TipoIdentificacion,
+                        cliente.DocumentoIdentidad,
+                        item.FechaInicio,
+                        item.FechaFin,
+                        item.NumeroHuespedes,
+                        true);
+
+                    var uriFacturaSoap = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                    string? facturaUrl = null;
+                    try
+                    {
+                        facturaUrl = await TravelioAPIConnector.Habitaciones.Connector.EmitirFacturaAsync(
+                            uriFacturaSoap!,
+                            reservaId,
+                            facturaInfo.NombreFactura,
+                            facturaInfo.Documento,
+                            facturaInfo.TipoDocumento,
+                            facturaInfo.Documento,
+                            facturaInfo.CorreoFactura,
+                            true);
+                    }
+                    catch (Exception invoiceEx)
+                    {
+                        log.LogError(invoiceEx, "Error al generar factura de habitación (fallback SOAP) {CarritoId}", item.Id);
+                    }
+
+                    var reservaDb = new DbReserva
+                    {
+                        ServicioId = item.ServicioId,
+                        CodigoReserva = reservaId.ToString(),
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
                     };
                     _db.Reservas.Add(reservaDb);
                     await _db.SaveChangesAsync();
@@ -1307,11 +1875,13 @@ public class TravelioIntegrationService
 
             foreach (var item in autos)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var dias = Math.Max(1, (decimal)(item.FechaFin.Date - item.FechaInicio.Date).TotalDays);
                 var monto = item.PrecioActualPorDia * dias;
                 var montoNegocio = monto * 0.9m;
+                var comision = monto - montoNegocio;
 
                 if (!await PagarNegocioAsync(item.Servicio, montoNegocio))
                 {
@@ -1332,7 +1902,8 @@ public class TravelioIntegrationService
                         cliente.DocumentoIdentidad,
                         cliente.CorreoElectronico,
                         item.FechaInicio,
-                        item.FechaFin);
+                        item.FechaFin,
+                        forceSoap);
 
                     var uriFactura = BuildUri(det, det.GenerarFacturaEndpoint);
                     string? facturaUrl = null;
@@ -1344,7 +1915,20 @@ public class TravelioIntegrationService
                             monto,
                             0m,
                             monto,
-                            (facturaInfo.NombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura));
+                            (facturaInfo.NombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura),
+                            forceSoap);
+                    }
+                    catch (NotImplementedException) when (IsREST && alternativo is not null)
+                    {
+                        var uriFacturaSoap = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                        facturaUrl = await TravelioAPIConnector.Autos.Connector.GenerarFacturaAsync(
+                            uriFacturaSoap!,
+                            reservaId,
+                            monto,
+                            0m,
+                            monto,
+                            (facturaInfo.NombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura),
+                            true);
                     }
                     catch (Exception invoiceEx)
                     {
@@ -1355,7 +1939,59 @@ public class TravelioIntegrationService
                     {
                         ServicioId = item.ServicioId,
                         CodigoReserva = reservaId.ToString(),
-                        FacturaUrl = facturaUrl
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
+                    };
+                    _db.Reservas.Add(reservaDb);
+                    await _db.SaveChangesAsync();
+                    _db.ReservasCompra.Add(new ReservaCompra { CompraId = compra.Id, ReservaId = reservaDb.Id });
+                    _db.CarritosAutos.Remove(item);
+                    huboExito = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriReservaSoap = BuildUri(alternativo, alternativo.CrearReservaEndpoint);
+                    var reservaId = await TravelioAPIConnector.Autos.Connector.CrearReservaAsync(
+                        uriReservaSoap!,
+                        item.IdAutoProveedor,
+                        item.HoldId ?? string.Empty,
+                        cliente.Nombre,
+                        cliente.Apellido,
+                        cliente.TipoIdentificacion,
+                        cliente.DocumentoIdentidad,
+                        cliente.CorreoElectronico,
+                        item.FechaInicio,
+                        item.FechaFin,
+                        true);
+
+                    var uriFacturaSoap = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                    string? facturaUrl = null;
+                    try
+                    {
+                        facturaUrl = await TravelioAPIConnector.Autos.Connector.GenerarFacturaAsync(
+                            uriFacturaSoap!,
+                            reservaId,
+                            monto,
+                            0m,
+                            monto,
+                            (facturaInfo.NombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura),
+                            true);
+                    }
+                    catch (Exception invoiceEx)
+                    {
+                        log.LogError(invoiceEx, "Error al generar factura de auto (fallback SOAP) {CarritoId}", item.Id);
+                    }
+
+                    var reservaDb = new DbReserva
+                    {
+                        ServicioId = item.ServicioId,
+                        CodigoReserva = reservaId.ToString(),
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
                     };
                     _db.Reservas.Add(reservaDb);
                     await _db.SaveChangesAsync();
@@ -1373,10 +2009,12 @@ public class TravelioIntegrationService
 
             foreach (var item in paquetes)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var monto = item.PrecioActual * item.Personas;
                 var montoNegocio = monto * 0.9m;
+                var comision = monto - montoNegocio;
 
                 if (!await PagarNegocioAsync(item.Servicio, montoNegocio))
                 {
@@ -1394,7 +2032,8 @@ public class TravelioIntegrationService
                         item.HoldId ?? string.Empty,
                         item.BookingUserId,
                         "TRANSFER",
-                        turistas);
+                        turistas,
+                        forceSoap);
 
                     var uriFactura = BuildUri(det, det.GenerarFacturaEndpoint);
                     string? facturaUrl = null;
@@ -1405,7 +2044,19 @@ public class TravelioIntegrationService
                             reserva.IdReserva,
                             monto,
                             0m,
-                            monto);
+                            monto,
+                            forceSoap);
+                    }
+                    catch (NotImplementedException) when (IsREST && alternativo is not null)
+                    {
+                        var uriFacturaSoap = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                        facturaUrl = await TravelioAPIConnector.Paquetes.Connector.EmitirFacturaAsync(
+                            uriFacturaSoap!,
+                            reserva.IdReserva,
+                            monto,
+                            0m,
+                            monto,
+                            true);
                     }
                     catch (Exception invoiceEx)
                     {
@@ -1416,7 +2067,54 @@ public class TravelioIntegrationService
                     {
                         ServicioId = item.ServicioId,
                         CodigoReserva = reserva.CodigoReserva,
-                        FacturaUrl = facturaUrl
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
+                    };
+                    _db.Reservas.Add(reservaDb);
+                    await _db.SaveChangesAsync();
+                    _db.ReservasCompra.Add(new ReservaCompra { CompraId = compra.Id, ReservaId = reservaDb.Id });
+                    _db.CarritosPaquetes.Remove(item);
+                    huboExito = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriReservaSoap = BuildUri(alternativo, alternativo.CrearReservaEndpoint);
+                    var reserva = await TravelioAPIConnector.Paquetes.Connector.CrearReservaAsync(
+                        uriReservaSoap!,
+                        item.IdPaqueteProveedor,
+                        item.HoldId ?? string.Empty,
+                        item.BookingUserId,
+                        "TRANSFER",
+                        turistas,
+                        true);
+
+                    var uriFacturaSoap = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                    string? facturaUrl = null;
+                    try
+                    {
+                        facturaUrl = await TravelioAPIConnector.Paquetes.Connector.EmitirFacturaAsync(
+                            uriFacturaSoap!,
+                            reserva.IdReserva,
+                            monto,
+                            0m,
+                            monto,
+                            true);
+                    }
+                    catch (Exception invoiceEx)
+                    {
+                        log.LogError(invoiceEx, "Error al generar factura de paquete (fallback SOAP) {CarritoId}", item.Id);
+                    }
+
+                    var reservaDb = new DbReserva
+                    {
+                        ServicioId = item.ServicioId,
+                        CodigoReserva = reserva.CodigoReserva,
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
                     };
                     _db.Reservas.Add(reservaDb);
                     await _db.SaveChangesAsync();
@@ -1434,10 +2132,12 @@ public class TravelioIntegrationService
 
             foreach (var item in mesas)
             {
-                if (item.Servicio.DetallesServicio.FirstOrDefault() is null) continue;
-                var det = item.Servicio.DetallesServicio.FirstOrDefault();
+                var (det, alternativo) = SeleccionarDetalle(item.Servicio.DetallesServicio, IsREST);
+                if (det is null) continue;
+                var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
                 var monto = item.Precio;
                 var montoNegocio = monto * 0.9m;
+                var comision = monto - montoNegocio;
 
                 if (!await PagarNegocioAsync(item.Servicio, montoNegocio))
                 {
@@ -1458,7 +2158,8 @@ public class TravelioIntegrationService
                         cliente.TipoIdentificacion,
                         cliente.DocumentoIdentidad,
                         item.FechaReserva,
-                        item.NumeroPersonas);
+                        item.NumeroPersonas,
+                        forceSoap);
 
                     var uriFactura = BuildUri(det, det.GenerarFacturaEndpoint);
                     string? facturaUrl = null;
@@ -1471,7 +2172,21 @@ public class TravelioIntegrationService
                             facturaInfo.NombreFactura,
                             facturaInfo.TipoDocumento,
                             facturaInfo.Documento,
-                            monto);
+                            monto,
+                            forceSoap);
+                    }
+                    catch (NotImplementedException) when (IsREST && alternativo is not null)
+                    {
+                        var uriFacturaSoap = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                        facturaUrl = await TravelioAPIConnector.Mesas.Connector.GenerarFacturaAsync(
+                            uriFacturaSoap!,
+                            reserva.IdReserva,
+                            facturaInfo.CorreoFactura,
+                            facturaInfo.NombreFactura,
+                            facturaInfo.TipoDocumento,
+                            facturaInfo.Documento,
+                            monto,
+                            true);
                     }
                     catch (Exception invoiceEx)
                     {
@@ -1482,7 +2197,60 @@ public class TravelioIntegrationService
                     {
                         ServicioId = item.ServicioId,
                         CodigoReserva = reserva.IdReserva ?? string.Empty,
-                        FacturaUrl = facturaUrl
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
+                    };
+                    _db.Reservas.Add(reservaDb);
+                    await _db.SaveChangesAsync();
+                    _db.ReservasCompra.Add(new ReservaCompra { CompraId = compra.Id, ReservaId = reservaDb.Id });
+                    _db.CarritosMesas.Remove(item);
+                    huboExito = true;
+                }
+                catch (NotImplementedException) when (IsREST && alternativo is not null)
+                {
+                    var uriReservaSoap = BuildUri(alternativo, alternativo.CrearReservaEndpoint);
+                    var reserva = await TravelioAPIConnector.Mesas.Connector.ConfirmarReservaAsync(
+                        uriReservaSoap!,
+                        item.IdMesa,
+                        item.HoldId ?? string.Empty,
+                        cliente.Nombre,
+                        cliente.Apellido,
+                        cliente.CorreoElectronico,
+                        cliente.TipoIdentificacion,
+                        cliente.DocumentoIdentidad,
+                        item.FechaReserva,
+                        item.NumeroPersonas,
+                        true);
+
+                    var uriFacturaSoap = BuildUri(alternativo, alternativo.GenerarFacturaEndpoint);
+                    string? facturaUrl = null;
+                    try
+                    {
+                        facturaUrl = await TravelioAPIConnector.Mesas.Connector.GenerarFacturaAsync(
+                            uriFacturaSoap!,
+                            reserva.IdReserva,
+                            facturaInfo.CorreoFactura,
+                            facturaInfo.NombreFactura,
+                            facturaInfo.TipoDocumento,
+                            facturaInfo.Documento,
+                            monto,
+                            true);
+                    }
+                    catch (Exception invoiceEx)
+                    {
+                        log.LogError(invoiceEx, "Error al generar factura de mesa (fallback SOAP) {CarritoId}", item.Id);
+                    }
+
+                    var reservaDb = new DbReserva
+                    {
+                        ServicioId = item.ServicioId,
+                        CodigoReserva = reserva.IdReserva ?? string.Empty,
+                        FacturaUrl = facturaUrl,
+                        Activa = true,
+                        ValorPagadoNegocio = montoNegocio,
+                        ComisionAgencia = comision
                     };
                     _db.Reservas.Add(reservaDb);
                     await _db.SaveChangesAsync();
@@ -1512,6 +2280,169 @@ public class TravelioIntegrationService
         ProcesarCompraYReservasAsync(clienteId, cuentaCliente, facturaInfo, logger).GetAwaiter().GetResult();
 
     #endregion
+
+    #region Cancelaciones y facturas
+
+    public async Task<bool?> CancelarReservaAsync(int reservaId, int cuentaCliente, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        try
+        {
+            var reserva = await _db.Reservas
+                .Include(r => r.Servicio).ThenInclude(s => s.DetallesServicio)
+                .FirstOrDefaultAsync(r => r.Id == reservaId);
+
+            if (reserva is null)
+            {
+                log.LogWarning("Reserva {ReservaId} no encontrada para cancelaci▋n", reservaId);
+                return null;
+            }
+
+            if (!reserva.Activa)
+            {
+                log.LogInformation("Reserva {ReservaId} ya estaba cancelada", reservaId);
+                return false;
+            }
+
+            var detallesRest = FiltrarDetallesPorProtocolo(reserva.Servicio.DetallesServicio, preferRest: true);
+            var detCancel = detallesRest.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest) ?? detallesRest.FirstOrDefault();
+            if (detCancel is null || string.IsNullOrWhiteSpace(detCancel.CancelarReservaEndpoint))
+            {
+                log.LogError("No se encontr▋ detalle REST para cancelar la reserva {ReservaId}", reservaId);
+                return false;
+            }
+
+            var uriCancel = BuildUri(detCancel, detCancel.CancelarReservaEndpoint ?? detCancel.ObtenerReservaEndpoint);
+
+            try
+            {
+                switch (reserva.Servicio.TipoServicio)
+                {
+                    case TipoServicio.Aerolinea:
+                        await AerolineaConnector.CancelarReservaAsync(uriCancel!, reserva.CodigoReserva);
+                        break;
+                    case TipoServicio.Hotel:
+                        await HabitacionesConnector.CancelarReservaAsync(uriCancel!, reserva.CodigoReserva);
+                        break;
+                    case TipoServicio.RentaVehiculos:
+                        await AutosConnector.CancelarReservaAsync(uriCancel!, reserva.CodigoReserva);
+                        break;
+                    case TipoServicio.PaquetesTuristicos:
+                        await PaquetesConnector.CancelarReservaAsync(uriCancel!, reserva.CodigoReserva);
+                        break;
+                    case TipoServicio.Restaurante:
+                        await MesasConnector.CancelarReservaAsync(uriCancel!, reserva.CodigoReserva);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "Error al invocar la cancelaci▋n remota para la reserva {ReservaId}", reservaId);
+            }
+
+            if (!int.TryParse(reserva.Servicio.NumeroCuenta, out var cuentaNegocio))
+            {
+                log.LogError("Cuenta del negocio inv▋lida para reserva {ReservaId}", reservaId);
+                return false;
+            }
+
+            var totalReembolso = reserva.ValorPagadoNegocio + reserva.ComisionAgencia;
+
+            var retiroNegocio = await TransferirClass.RealizarTransferenciaAsync(TransferirClass.cuentaDefaultTravelio, reserva.ValorPagadoNegocio, cuentaNegocio);
+            if (!retiroNegocio)
+            {
+                log.LogError("No se pudo revertir el pago al negocio {ServicioId} para la reserva {ReservaId}", reserva.ServicioId, reservaId);
+                return false;
+            }
+
+            var reembolsoCliente = await TransferirClass.RealizarTransferenciaAsync(cuentaCliente, totalReembolso, TransferirClass.cuentaDefaultTravelio);
+            if (!reembolsoCliente)
+            {
+                log.LogError("No se pudo reembolsar al cliente por la reserva {ReservaId}", reservaId);
+                return false;
+            }
+
+            reserva.Activa = false;
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync();
+            log.LogError(ex, "Error al cancelar la reserva {ReservaId}", reservaId);
+            return null;
+        }
+    }
+
+    public bool? CancelarReserva(int reservaId, int cuentaCliente, ILogger? logger = null) =>
+        CancelarReservaAsync(reservaId, cuentaCliente, logger).GetAwaiter().GetResult();
+
+    public async Task<bool?> ReservaEstaCanceladaAsync(int reservaId, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var reserva = await _db.Reservas.FirstOrDefaultAsync(r => r.Id == reservaId);
+            if (reserva is null) return null;
+            return !reserva.Activa;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al consultar estado de cancelaci▋n para reserva {ReservaId}", reservaId);
+            return null;
+        }
+    }
+
+    public bool? ReservaEstaCancelada(int reservaId, ILogger? logger = null) =>
+        ReservaEstaCanceladaAsync(reservaId, logger).GetAwaiter().GetResult();
+
+    public async Task<bool?> EstablecerFacturaCompraAsync(int compraId, string? facturaUrl, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var compra = await _db.Compras.FirstOrDefaultAsync(c => c.Id == compraId);
+            if (compra is null) return null;
+
+            compra.FacturaUrl = facturaUrl;
+            await _db.SaveChangesAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al establecer factura de compra {CompraId}", compraId);
+            return null;
+        }
+    }
+
+    public bool? EstablecerFacturaCompra(int compraId, string? facturaUrl, ILogger? logger = null) =>
+        EstablecerFacturaCompraAsync(compraId, facturaUrl, logger).GetAwaiter().GetResult();
+
+    public async Task<string?> ObtenerFacturaCompraAsync(int compraId, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var factura = await _db.Compras
+                .Where(c => c.Id == compraId)
+                .Select(c => c.FacturaUrl)
+                .FirstOrDefaultAsync();
+            return factura;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener factura de la compra {CompraId}", compraId);
+            return null;
+        }
+    }
+
+    public string? ObtenerFacturaCompra(int compraId, ILogger? logger = null) =>
+        ObtenerFacturaCompraAsync(compraId, logger).GetAwaiter().GetResult();
+
+    #endregion
+
     #region Consultas de reservas
 
     public async Task<int[]?> ObtenerReservasIdsPorClienteAsync(int clienteId, ILogger? logger = null)

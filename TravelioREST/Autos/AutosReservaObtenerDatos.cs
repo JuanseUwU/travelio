@@ -21,8 +21,9 @@ public class BuscarReservaResponse
 
 public static class AutosReservaObtenerDatos
 {
-    public static async Task<BuscarReservaResponse> GetReservaAsync(string uri)
+    public static async Task<BuscarReservaResponse> GetReservaAsync(string uri, int numeroReserva)
     {
+        uri = $"{uri}/{numeroReserva}";
         var result = await Global.CachedHttpClient.GetFromJsonAsync<BuscarReservaResponse>(uri);
         return result ?? throw new InvalidOperationException();
     }

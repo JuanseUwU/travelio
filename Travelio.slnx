@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="BookingMvcDotNet/BookingMvcDotNet.csproj" />
   <Project Path="TravelioAPIConnector/TravelioAPIConnector.csproj" Id="c7ea1597-3323-4e37-b0b2-694f1b04f310" />
   <Project Path="TravelioBankConnector/TravelioBankConnector.csproj" Id="155383da-9174-4ef6-9db5-3de985ad8b38" />
   <Project Path="TravelioDatabaseConnector/TravelioDatabaseConnector.csproj" Id="87f66384-dbc5-49f9-a043-24c73e367daf" />

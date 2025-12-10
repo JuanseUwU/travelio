@@ -24,16 +24,18 @@ public sealed class HoldResponse
 
 public static class HoldCreator
 {
-    public static async Task<HoldResponse> CreateHoldAsync(string url, int idVuelo, string[] seats, int duracionHoldSegundos = 600)
+    public static async Task<HoldResponse> CreateHoldAsync(string url, int idVuelo, int seats, int duracionHoldSegundos = 600)
     {
-        var request = new HoldRequest
-        {
-            idVuelo = idVuelo,
-            seats = seats,
-            duracionHoldSegundos = duracionHoldSegundos
-        };
-        var response = await CachedHttpClient.PostAsJsonAsync(url, request);
-        var hold = await response.Content.ReadFromJsonAsync<HoldResponse>();
-        return hold ?? throw new InvalidOperationException();
+        throw new NotImplementedException("La creación de holds ha sido deshabilitada temporalmente.");
+
+        //var request = new HoldRequest
+        //{
+        //    idVuelo = idVuelo,
+        //    seats = seats,
+        //    duracionHoldSegundos = duracionHoldSegundos
+        //};
+        //var response = await CachedHttpClient.PostAsJsonAsync(url, request);
+        //var hold = await response.Content.ReadFromJsonAsync<HoldResponse>();
+        //return hold ?? throw new InvalidOperationException();
     }
 }

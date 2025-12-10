@@ -22,9 +22,10 @@ public static class Connector
         string? tipoHabitacion = null,
         int? capacidad = null,
         decimal? precioMin = null,
-        decimal? precioMax = null)
+        decimal? precioMax = null,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             var habitacionesRest = await HabitacionesGetter.GetHabitacionesAsync(uri, fechaInicio, fechaFin, tipoHabitacion, capacidad, precioMin, precioMax);
             return Array.ConvertAll(habitacionesRest, h =>
@@ -50,9 +51,9 @@ public static class Connector
         return Array.ConvertAll(habitacionesDto, MapHabitacion);
     }
 
-    public static async Task<bool> ValidarDisponibilidadAsync(string uri, string idHabitacion, DateTime fechaInicio, DateTime fechaFin)
+    public static async Task<bool> ValidarDisponibilidadAsync(string uri, string idHabitacion, DateTime fechaInicio, DateTime fechaFin, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             var disponibilidad = await RoomCheckAvailable.CheckAvailabilityAsync(uri, idHabitacion, fechaInicio, fechaFin);
             return disponibilidad.disponible;
@@ -70,9 +71,10 @@ public static class Connector
         DateTime fechaFin,
         int numeroHuespedes,
         int? duracionHoldSegundos = null,
-        decimal? precioActual = null)
+        decimal? precioActual = null,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             var hold = await HoldCreator.CrearHoldAsync(uri, idHabitacion, fechaInicio, fechaFin, numeroHuespedes, duracionHoldSegundos, precioActual);
             return hold.idHold;
@@ -84,9 +86,9 @@ public static class Connector
         return prerreserva?.IdHold ?? throw new InvalidOperationException("No se pudo crear la prerreserva de habitacion.");
     }
 
-    public static async Task<int> CrearUsuarioExternoAsync(string uri, string correo, string nombre, string apellido)
+    public static async Task<int> CrearUsuarioExternoAsync(string uri, string correo, string nombre, string apellido, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             var cliente = await ClienteExternoCreator.CrearClienteExternoAsync(uri, correo, nombre, apellido);
             return cliente.id;
@@ -108,9 +110,10 @@ public static class Connector
         string documento,
         DateTime fechaInicio,
         DateTime fechaFin,
-        int numeroHuespedes)
+        int numeroHuespedes,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             var reserva = await BookRoom.ReservarHabitacionAsync(uri, idHabitacion, idHold, nombre, apellido, correo, tipoDocumento, documento, fechaInicio, fechaFin, numeroHuespedes);
             return reserva.idReserva;
@@ -128,9 +131,10 @@ public static class Connector
         string apellido,
         string tipoDocumento,
         string documento,
-        string correo)
+        string correo,
+        bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             var invoice = await InvoiceGenerator.GenerarFacturaAsync(uri, idReserva, nombre, apellido, tipoDocumento, documento, correo);
             return invoice.urlPdf ?? throw new InvalidOperationException("No se pudo emitir la factura.");
@@ -141,9 +145,9 @@ public static class Connector
         return response.Body.emitirFacturaHotelResult?.UrlPdf ?? throw new InvalidOperationException("No se pudo emitir la factura.");
     }
 
-    public static async Task<Reserva> ObtenerDatosReservaAsync(string uri, int idReserva)
+    public static async Task<Reserva> ObtenerDatosReservaAsync(string uri, int idReserva, bool forceSoap = false)
     {
-        if (IsREST)
+        if (IsREST && !forceSoap)
         {
             var datos = await BookedRoomInfo.GetBookedRoomInfoAsync(uri, idReserva);
             return new Reserva(
@@ -202,6 +206,22 @@ public static class Connector
                 datos.Imagenes?.Split('|') ?? [],
                 datos.UrlPdf ?? string.Empty);
         }
+    }
+
+    public static async Task<(bool exito, decimal montoDevuelto)> CancelarReservaAsync(string uri, string idReserva, bool forceSoap = false)
+    {
+        if (IsREST && !forceSoap)
+        {
+            if (!int.TryParse(idReserva, out var reservaId))
+            {
+                throw new FormatException($"El id de reserva {idReserva} no es un entero v\u00e1lido para la API REST de habitaciones.");
+            }
+
+            var resultado = await CancelReservation.CancelarReservaAsync(uri, reservaId);
+            return (resultado.success, resultado.montoPagado);
+        }
+
+        throw new NotSupportedException("La cancelaci\u00f3n SOAP para habitaciones no est\u00e1 soportada.");
     }
 
     private static Habitacion MapHabitacion(HabitacionListItemDto dto)

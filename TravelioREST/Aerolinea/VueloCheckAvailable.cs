@@ -6,16 +6,24 @@ using static TravelioREST.Global;
 
 namespace TravelioREST.Aerolinea;
 
-public sealed class DisponibilidadRequest
+public class DisponibilidadRequest
 {
-    public int idVuelo { get; set; }
-    public int pasajeros { get; set; }
+    public int IdVuelo { get; set; }
+    public int Pasajeros { get; set; }
 }
 
-public class Disponibilidad
+public class DisponibilidadResponse
 {
     public bool disponible { get; set; }
+    public _LinksDisponibilidad _links { get; set; }
 }
+
+public class _LinksDisponibilidad
+{
+    public string self { get; set; }
+    public string hold { get; set; }
+}
+
 
 
 public static class VueloCheckAvailable
@@ -24,11 +32,11 @@ public static class VueloCheckAvailable
     {
         var request = new DisponibilidadRequest
         {
-            idVuelo = idVuelo,
-            pasajeros = numPasajeros
+            IdVuelo = idVuelo,
+            Pasajeros = numPasajeros
         };
         var response = await CachedHttpClient.PostAsJsonAsync(url, request);
-        var disponibilidad = await response.Content.ReadFromJsonAsync<Disponibilidad>();
+        var disponibilidad = await response.Content.ReadFromJsonAsync<DisponibilidadResponse>();
         return disponibilidad?.disponible ?? false;
     }
 }

@@ -7,9 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Travelio-master\Travelio-master\TravelioAPIConnector\TravelioAPIConnector.csproj" />
-    <ProjectReference Include="..\..\..\Travelio-master\Travelio-master\TravelioBankConnector\TravelioBankConnector.csproj" />
-    <ProjectReference Include="..\..\..\Travelio-master\Travelio-master\TravelioDatabaseConnector\TravelioDatabaseConnector.csproj" />
+    <ProjectReference Include="..\TravelioAPIConnector\TravelioAPIConnector.csproj" />
+    <ProjectReference Include="..\TravelioBankConnector\TravelioBankConnector.csproj" />
+    <ProjectReference Include="..\TravelioDatabaseConnector\TravelioDatabaseConnector.csproj" />
   </ItemGroup>
 
   <ItemGroup>
