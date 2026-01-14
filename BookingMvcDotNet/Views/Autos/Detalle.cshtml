@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = Model.Tipo;
     
-    // Imagen de respaldo según tipo
+    // Imagen de respaldo segï¿½n tipo
     string GetFallbackImage(string tipo) {
         var t = tipo?.ToLower() ?? "";
         if (t.Contains("suv") || t.Contains("sportage")) return "https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?w=800&h=500&fit=crop";
@@ -46,7 +46,7 @@
 
             <div class="card border-0 shadow-sm" style="border-radius: 16px;">
                 <div class="card-body p-4">
-                    <h5 class="card-title fw-bold mb-3">? Características del vehículo</h5>
+                    <h5 class="card-title fw-bold mb-3">? Caracterï¿½sticas del vehï¿½culo</h5>
                     <div class="row g-3">
                         <div class="col-md-6">
                             <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
@@ -70,7 +70,7 @@
                             <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
                                 <span class="fs-3">??</span>
                                 <div>
-                                    <small class="text-muted d-block">Ubicación</small>
+                                    <small class="text-muted d-block">Ubicaciï¿½n</small>
                                     <strong>@Model.Ciudad, @Model.Pais</strong>
                                 </div>
                             </div>
@@ -93,17 +93,17 @@
         <div class="col-lg-4">
             <div class="card shadow border-0 sticky-top" style="top: 20px; border-radius: 20px;">
                 <div class="card-body p-4">
-                    <h5 class="fw-bold mb-4">?? Reservar Vehículo</h5>
+                    <h5 class="fw-bold mb-4">?? Reservar Vehï¿½culo</h5>
                     
                     <!-- Precio -->
                     <div class="mb-4 p-3 rounded-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                         @if (Model.TieneDescuento)
                         {
                             <span class="badge bg-danger mb-2">?? -@Model.DescuentoPorcentaje.ToString("0")% DESCUENTO</span>
-                            <div class="text-white-50 text-decoration-line-through">$@Model.PrecioNormalPorDia.ToString("N2")/día</div>
+                            <div class="text-white-50 text-decoration-line-through">$@Model.PrecioNormalPorDia.ToString("N2")/dï¿½a</div>
                         }
                         <div class="display-5 fw-bold text-white">
-                            $@Model.PrecioActualPorDia.ToString("N2")<small class="fs-6 opacity-75">/día</small>
+                            $@Model.PrecioActualPorDia.ToString("N2")<small class="fs-6 opacity-75">/dï¿½a</small>
                         </div>
                     </div>
 
@@ -141,7 +141,7 @@
                         <!-- Total estimado -->
                         <div class="border-top pt-3 mb-3">
                             <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted"><span id="diasRenta">@Model.DiasRenta</span> día(s) x $@Model.PrecioActualPorDia.ToString("N2")</span>
+                                <span class="text-muted"><span id="diasRenta">@Model.DiasRenta</span> dï¿½a(s) x $@Model.PrecioActualPorDia.ToString("N2")</span>
                                 <strong id="totalEstimado">$@Model.TotalEstimado.ToString("N2")</strong>
                             </div>
                         </div>
@@ -154,7 +154,7 @@
                     </form>
                     
                     <div class="text-center mt-3">
-                        <small class="text-muted">?? Reserva segura • Cancelación flexible</small>
+                        <small class="text-muted">?? Reserva segura ï¿½ Cancelaciï¿½n flexible</small>
                     </div>
                 </div>
             </div>
@@ -166,10 +166,13 @@
 <script>
     const servicioId = @Model.ServicioId;
     const idAuto = '@Model.IdAuto';
-    const precioPorDia = @Model.PrecioActualPorDia;
+    const precioPorDia = parseFloat('@Model.PrecioActualPorDia.ToString(System.Globalization.CultureInfo.InvariantCulture)');
 
     document.getElementById('fechaInicio').addEventListener('change', verificarDisponibilidad);
     document.getElementById('fechaFin').addEventListener('change', verificarDisponibilidad);
+    if (document.getElementById('fechaInicio').value && document.getElementById('fechaFin').value) {
+        verificarDisponibilidad();
+    }
 
     async function verificarDisponibilidad() {
         const fechaInicio = document.getElementById('fechaInicio').value;
@@ -188,11 +191,19 @@
                 body: `servicioId=${servicioId}&idAuto=${idAuto}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
             });
 
+            if (!response.ok) {
+                throw new Error('Respuesta invalida del servidor');
+            }
+
             const result = await response.json();
             const alertDiv = document.getElementById('disponibilidadAlert');
             const btn = document.getElementById('btnAgregar');
 
-            if (result.disponible) {
+            if (result.success === false) {
+                alertDiv.className = 'alert alert-warning mb-3';
+                alertDiv.innerHTML = '<i class="bi bi-exclamation-triangle"></i> <strong>No disponible</strong>';
+                btn.disabled = true;
+            } else if (result.disponible) {
                 alertDiv.className = 'alert alert-success mb-3';
                 alertDiv.innerHTML = '<i class="bi bi-check-circle"></i> <strong>Disponible</strong>';
                 btn.disabled = false;
@@ -222,6 +233,10 @@
                 body: `servicioId=${servicioId}&idAuto=${idAuto}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
             });
 
+            if (!response.ok) {
+                throw new Error('Respuesta invalida del servidor');
+            }
+
             const result = await response.json();
             alert(result.message);
 
@@ -235,3 +250,4 @@
     });
 </script>
 }
+

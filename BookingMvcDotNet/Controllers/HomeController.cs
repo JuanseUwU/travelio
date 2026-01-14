@@ -6,8 +6,10 @@ using BookingMvcDotNet.Models;
 using BookingMvcDotNet.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
-using Microsoft.EntityFrameworkCore;
-using TravelioDatabaseConnector.Data;
+using TravelioDatabaseConnector.Enums;
+using TravelioDatabaseConnector.Models;
+using TravelioIntegrator.Models.Carrito;
+using TravelioIntegrator.Services;
 
 namespace BookingMvcDotNet.Controllers
 {
@@ -17,19 +19,19 @@ namespace BookingMvcDotNet.Controllers
         private readonly IBookingService _bookingService;
         private readonly IAuthService _authService;
         private readonly ICheckoutService _checkoutService;
-        private readonly TravelioDbContext _dbContext;
+        private readonly TravelioIntegrationService _integrationService;
         private const string CART_SESSION_KEY = "MyCartSession";
 
-        public HomeController(IBookingService bookingService, IAuthService authService, ICheckoutService checkoutService, TravelioDbContext dbContext)
+        public HomeController(IBookingService bookingService, IAuthService authService, ICheckoutService checkoutService, TravelioIntegrationService integrationService)
         {
             _bookingService = bookingService;
             _authService = authService;
             _checkoutService = checkoutService;
-            _dbContext = dbContext;
+            _integrationService = integrationService;
         }
 
         /// <summary>
-        /// Devuelve recomendaciones de otros servicios en la misma ciudad (excluye tipo/título opcionalmente).
+        /// Devuelve recomendaciones de otros servicios en la misma ciudad (excluye tipo/tï¿½tulo opcionalmente).
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> RecomendacionesCiudad(string ciudad, string? excludeTipo, string? excludeTitulo, int limit = 6)
@@ -62,7 +64,7 @@ namespace BookingMvcDotNet.Controllers
         }
 
         /// <summary>
-        /// Devuelve una lista de ciudades disponibles basadas en los items retornados por la API de búsqueda.
+        /// Devuelve una lista de ciudades disponibles basadas en los items retornados por la API de bï¿½squeda.
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> CiudadesDisponibles()
@@ -89,7 +91,7 @@ namespace BookingMvcDotNet.Controllers
         }
 
         // ============================
-        //  VISTAS PÚBLICAS
+        //  VISTAS Pï¿½BLICAS
         // ============================
         [HttpGet]
         public async Task<IActionResult> Index()
@@ -222,7 +224,7 @@ namespace BookingMvcDotNet.Controllers
                 return View(model);
             }
 
-            TempData["SuccessMessage"] = "¡Registro exitoso! Ahora puedes iniciar sesión.";
+            TempData["SuccessMessage"] = "ï¿½Registro exitoso! Ahora puedes iniciar sesiï¿½n.";
             return RedirectToAction("Login");
         }
 
@@ -230,6 +232,213 @@ namespace BookingMvcDotNet.Controllers
         {
             HttpContext.Session.Clear();
             return RedirectToAction("Index");
+        }
+
+        private static string MapTipoServicio(TipoServicio tipo) =>
+            tipo switch
+            {
+                TipoServicio.RentaVehiculos => "CAR",
+                TipoServicio.Hotel => "HOTEL",
+                TipoServicio.Aerolinea => "FLIGHT",
+                TipoServicio.Restaurante => "RESTAURANT",
+                TipoServicio.PaquetesTuristicos => "PACKAGE",
+                _ => "PACKAGE"
+            };
+
+        private static TipoServicio? MapTipoServicioFromCart(string? tipo) =>
+            tipo switch
+            {
+                "CAR" => TipoServicio.RentaVehiculos,
+                "HOTEL" => TipoServicio.Hotel,
+                "FLIGHT" => TipoServicio.Aerolinea,
+                "RESTAURANT" => TipoServicio.Restaurante,
+                "PACKAGE" => TipoServicio.PaquetesTuristicos,
+                _ => null
+            };
+
+        private static string BuildCartKey(CartItemViewModel item)
+        {
+            if (item.ServicioId == 0 && string.IsNullOrWhiteSpace(item.IdProducto))
+            {
+                return $"misc:{item.Tipo}|{item.Titulo}";
+            }
+
+            var fechaInicio = item.FechaInicio?.Date.ToString("yyyy-MM-dd") ?? "";
+            var fechaFin = item.FechaFin?.Date.ToString("yyyy-MM-dd") ?? "";
+            var personas = item.NumeroPersonas?.ToString() ?? "";
+            return $"{item.Tipo}|{item.ServicioId}|{item.IdProducto}|{fechaInicio}|{fechaFin}|{personas}";
+        }
+
+        private static string? ObtenerImagenHabitacion(string? imagenes)
+        {
+            if (string.IsNullOrWhiteSpace(imagenes))
+            {
+                return null;
+            }
+
+            var partes = imagenes.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (partes.Length > 0)
+            {
+                return partes[0];
+            }
+
+            partes = imagenes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return partes.Length > 0 ? partes[0] : null;
+        }
+
+        private async Task<List<CartItemViewModel>> ObtenerCarritoActualAsync()
+        {
+            var cartItems = HttpContext.Session.Get<List<CartItemViewModel>>(CART_SESSION_KEY)
+                ?? new List<CartItemViewModel>();
+
+            var clienteId = HttpContext.Session.GetInt32("ClienteId");
+            if (!clienteId.HasValue)
+            {
+                return cartItems;
+            }
+
+            var servicios = await _integrationService.ObtenerServiciosActivosAsync() ?? new List<Servicio>();
+            var serviciosMap = servicios.ToDictionary(s => s.Id, s => s.Nombre);
+
+            var dbItems = new List<CartItemViewModel>();
+
+            var autos = await _integrationService.ObtenerCarritoAutosAsync(clienteId.Value) ?? [];
+            foreach (var item in autos)
+            {
+                var dias = Math.Max(1, (int)(item.FechaFin.Date - item.FechaInicio.Date).TotalDays);
+                var proveedor = serviciosMap.TryGetValue(item.ServicioId, out var nombre) ? nombre : "Proveedor";
+                dbItems.Add(new CartItemViewModel
+                {
+                    CarritoItemId = item.Id,
+                    Tipo = "CAR",
+                    ServicioId = item.ServicioId,
+                    IdProducto = item.IdAutoProveedor,
+                    Titulo = $"{item.Tipo} - {proveedor}",
+                    Detalle = $"{item.Ciudad}, {item.Pais} | {item.FechaInicio:dd/MM/yyyy} - {item.FechaFin:dd/MM/yyyy} ({dias} dias)",
+                    ImagenUrl = item.UriImagen,
+                    PrecioOriginal = item.PrecioNormalPorDia * dias,
+                    PrecioFinal = item.PrecioActualPorDia * dias,
+                    PrecioUnitario = item.PrecioActualPorDia,
+                    Cantidad = 1,
+                    FechaInicio = item.FechaInicio,
+                    FechaFin = item.FechaFin,
+                    UnidadPrecio = "por dia"
+                });
+            }
+
+            var habitaciones = await _integrationService.ObtenerCarritoHabitacionesAsync(clienteId.Value) ?? [];
+            foreach (var item in habitaciones)
+            {
+                var noches = Math.Max(1, (item.FechaFin.Date - item.FechaInicio.Date).Days);
+                dbItems.Add(new CartItemViewModel
+                {
+                    CarritoItemId = item.Id,
+                    Tipo = "HOTEL",
+                    ServicioId = item.ServicioId,
+                    IdProducto = item.IdHabitacionProveedor,
+                    Titulo = $"{item.Hotel} - {item.NombreHabitacion}",
+                    Detalle = $"{item.Ciudad}, {item.Pais} | {item.TipoHabitacion} | {item.NumeroHuespedes} huespedes",
+                    ImagenUrl = ObtenerImagenHabitacion(item.Imagenes),
+                    PrecioOriginal = item.PrecioNormal * noches,
+                    PrecioFinal = item.PrecioActual * noches,
+                    PrecioUnitario = item.PrecioActual,
+                    Cantidad = 1,
+                    FechaInicio = item.FechaInicio,
+                    FechaFin = item.FechaFin,
+                    NumeroPersonas = item.NumeroHuespedes,
+                    UnidadPrecio = $"({noches} noches)"
+                });
+            }
+
+            var vuelos = await _integrationService.ObtenerCarritoVuelosAsync(clienteId.Value) ?? [];
+            foreach (var item in vuelos)
+            {
+                dbItems.Add(new CartItemViewModel
+                {
+                    CarritoItemId = item.Id,
+                    Tipo = "FLIGHT",
+                    ServicioId = item.ServicioId,
+                    IdProducto = item.IdVueloProveedor,
+                    Titulo = $"{item.Origen} - {item.Destino}",
+                    Detalle = $"{item.NombreAerolinea} | {item.TipoCabina} | {item.CantidadPasajeros} pasajero(s)",
+                    PrecioOriginal = item.PrecioNormal * item.CantidadPasajeros,
+                    PrecioFinal = item.PrecioActual * item.CantidadPasajeros,
+                    PrecioUnitario = item.PrecioActual,
+                    Cantidad = 1,
+                    FechaInicio = item.FechaVuelo,
+                    FechaFin = item.FechaVuelo,
+                    NumeroPersonas = item.CantidadPasajeros,
+                    UnidadPrecio = $"({item.CantidadPasajeros} pasajeros)"
+                });
+            }
+
+            var paquetes = await _integrationService.ObtenerCarritoPaquetesAsync(clienteId.Value) ?? [];
+            foreach (var item in paquetes)
+            {
+                var fechaFin = item.FechaInicio.AddDays(item.Duracion);
+                dbItems.Add(new CartItemViewModel
+                {
+                    CarritoItemId = item.Id,
+                    Tipo = "PACKAGE",
+                    ServicioId = item.ServicioId,
+                    IdProducto = item.IdPaqueteProveedor,
+                    Titulo = item.Nombre,
+                    Detalle = $"{item.Ciudad}, {item.Pais} | {item.TipoActividad} | {item.Duracion} dias",
+                    ImagenUrl = item.ImagenUrl,
+                    PrecioOriginal = item.PrecioNormal * item.Personas,
+                    PrecioFinal = item.PrecioActual * item.Personas,
+                    PrecioUnitario = item.PrecioActual,
+                    Cantidad = 1,
+                    FechaInicio = item.FechaInicio,
+                    FechaFin = fechaFin,
+                    NumeroPersonas = item.Personas,
+                    UnidadPrecio = $"({item.Personas} personas)"
+                });
+            }
+
+            var mesas = await _integrationService.ObtenerCarritoMesasAsync(clienteId.Value) ?? [];
+            foreach (var item in mesas)
+            {
+                var proveedor = serviciosMap.TryGetValue(item.ServicioId, out var nombre) ? nombre : "Restaurante";
+                dbItems.Add(new CartItemViewModel
+                {
+                    CarritoItemId = item.Id,
+                    Tipo = "RESTAURANT",
+                    ServicioId = item.ServicioId,
+                    IdProducto = item.IdMesa.ToString(),
+                    Titulo = $"Mesa {item.NumeroMesa} - {item.TipoMesa}",
+                    Detalle = $"{proveedor} | {item.NumeroPersonas} personas",
+                    ImagenUrl = item.ImagenUrl,
+                    PrecioOriginal = item.Precio,
+                    PrecioFinal = item.Precio,
+                    PrecioUnitario = item.Precio,
+                    Cantidad = 1,
+                    FechaInicio = item.FechaReserva,
+                    FechaFin = item.FechaReserva,
+                    NumeroPersonas = item.NumeroPersonas,
+                    UnidadPrecio = "por reserva"
+                });
+            }
+
+            var sessionMap = cartItems.ToDictionary(BuildCartKey, StringComparer.OrdinalIgnoreCase);
+            foreach (var dbItem in dbItems)
+            {
+                var key = BuildCartKey(dbItem);
+                if (sessionMap.TryGetValue(key, out var existing))
+                {
+                    if (!existing.CarritoItemId.HasValue)
+                    {
+                        existing.CarritoItemId = dbItem.CarritoItemId;
+                    }
+                    continue;
+                }
+
+                cartItems.Add(dbItem);
+                sessionMap[key] = dbItem;
+            }
+
+            HttpContext.Session.Set(CART_SESSION_KEY, cartItems);
+            return cartItems;
         }
 
         // ============================
@@ -246,13 +455,8 @@ namespace BookingMvcDotNet.Controllers
             if (cliente == null) return RedirectToAction("Login");
 
             // Obtener compras del cliente con sus reservas
-            var compras = await _dbContext.Compras
-                .Include(c => c.ReservasCompra)
-                    .ThenInclude(rc => rc.Reserva)
-                        .ThenInclude(r => r.Servicio)
-                .Where(c => c.ClienteId == clienteId.Value)
-                .OrderByDescending(c => c.FechaCompra)
-                .ToListAsync();
+            var compras = await _integrationService.ObtenerComprasPorClienteAsync(clienteId.Value)
+                ?? new List<Compra>();
 
             var orders = compras.Select(c => new OrderViewModel
             {
@@ -261,27 +465,21 @@ namespace BookingMvcDotNet.Controllers
                 Total = c.ValorPagado,
                 FacturaTravelioUrl = Url.Action("FacturaTravelio", "Home", new { compraId = c.Id }),
                 Items = c.ReservasCompra.Select(rc => {
-                    var servicio = rc.Reserva?.Servicio;
-                    var tipoServicio = servicio?.TipoServicio.ToString() ?? "Servicio";
-                    var reservaActiva = rc.Reserva?.Activa ?? true;
+                    var reserva = rc.Reserva;
+                    var servicio = reserva?.Servicio;
+                    var reservaActiva = reserva?.Activa ?? true;
+                    var tipo = servicio is null ? "PACKAGE" : MapTipoServicio(servicio.TipoServicio);
+                    var precioUnitario = (reserva?.ValorPagadoNegocio ?? 0m) + (reserva?.ComisionAgencia ?? 0m);
                     return new OrderItemViewModel
                     {
-                        Tipo = tipoServicio switch
-                        {
-                            "RentaVehiculos" => "CAR",
-                            "Hotel" => "HOTEL",
-                            "Aerolinea" => "FLIGHT",
-                            "Restaurante" => "RESTAURANT",
-                            "PaquetesTuristicos" => "PACKAGE",
-                            _ => "PACKAGE"
-                        },
+                        Tipo = tipo,
                         Titulo = servicio?.Nombre ?? "Servicio",
                         Cantidad = 1,
-                        PrecioUnitario = c.ValorPagado / Math.Max(1, c.ReservasCompra.Count) / 1.12m,
-                        CodigoReserva = rc.Reserva?.CodigoReserva ?? "",
-                        FacturaProveedorUrl = rc.Reserva?.FacturaUrl,
-                        ReservaId = rc.Reserva?.Id ?? 0,
-                        ServicioId = rc.Reserva?.ServicioId ?? 0,
+                        PrecioUnitario = precioUnitario,
+                        CodigoReserva = reserva?.CodigoReserva ?? "",
+                        FacturaProveedorUrl = reserva?.FacturaUrl,
+                        ReservaId = reserva?.Id ?? 0,
+                        ServicioId = reserva?.ServicioId ?? 0,
                         Activa = reservaActiva,
                         PuedeCancelar = reservaActiva
                     };
@@ -320,12 +518,9 @@ namespace BookingMvcDotNet.Controllers
         }
 
         [HttpGet]
-        public IActionResult Carrito()
+        public async Task<IActionResult> Carrito()
         {
-            var cartItems =
-                HttpContext.Session.Get<List<CartItemViewModel>>(CART_SESSION_KEY)
-                ?? new List<CartItemViewModel>();
-
+            var cartItems = await ObtenerCarritoActualAsync();
             return View(new CartViewModel { Items = cartItems });
         }
 
@@ -339,8 +534,7 @@ namespace BookingMvcDotNet.Controllers
             if (!clienteId.HasValue)
                 return RedirectToAction("Login");
 
-            var cartItems = HttpContext.Session.Get<List<CartItemViewModel>>(CART_SESSION_KEY)
-                ?? new List<CartItemViewModel>();
+            var cartItems = await ObtenerCarritoActualAsync();
 
             if (!cartItems.Any())
                 return RedirectToAction("Carrito");
@@ -371,17 +565,17 @@ namespace BookingMvcDotNet.Controllers
         {
             var clienteId = HttpContext.Session.GetInt32("ClienteId");
             if (!clienteId.HasValue)
-                return Json(new { success = false, message = "Debes iniciar sesión." });
+                return Json(new { success = false, message = "Debes iniciar sesiï¿½n." });
 
             var cartItems = HttpContext.Session.Get<List<CartItemViewModel>>(CART_SESSION_KEY)
                 ?? new List<CartItemViewModel>();
 
             if (!cartItems.Any())
-                return Json(new { success = false, message = "Carrito vacío." });
+                return Json(new { success = false, message = "Carrito vacï¿½o." });
 
-            // Validar número de cuenta bancaria
+            // Validar nï¿½mero de cuenta bancaria
             if (!int.TryParse(model.NumeroCuentaBancaria, out var cuentaBancaria))
-                return Json(new { success = false, message = "Número de cuenta bancaria inválido." });
+                return Json(new { success = false, message = "Nï¿½mero de cuenta bancaria invï¿½lido." });
 
             var datosFacturacion = new DatosFacturacion
             {
@@ -400,15 +594,31 @@ namespace BookingMvcDotNet.Controllers
 
             if (resultado.Exitoso)
             {
+                foreach (var item in cartItems)
+                {
+                    if (!item.CarritoItemId.HasValue)
+                    {
+                        continue;
+                    }
+
+                    var tipoServicio = MapTipoServicioFromCart(item.Tipo);
+                    if (!tipoServicio.HasValue)
+                    {
+                        continue;
+                    }
+
+                    await _integrationService.EliminarItemCarritoAsync(tipoServicio.Value, item.CarritoItemId.Value);
+                }
+
                 HttpContext.Session.Remove(CART_SESSION_KEY);
                 
-                // Guardar resultado en TempData para mostrar en la página de confirmación
+                // Guardar resultado en TempData para mostrar en la pï¿½gina de confirmaciï¿½n
                 TempData["CheckoutExitoso"] = true;
                 TempData["CheckoutMensaje"] = resultado.Mensaje;
                 TempData["CompraId"] = resultado.CompraId;
                 TempData["TotalPagado"] = resultado.TotalPagado.ToString("C");
                 
-                // Serializar las reservas para mostrar en la confirmación
+                // Serializar las reservas para mostrar en la confirmaciï¿½n
                 var reservasJson = System.Text.Json.JsonSerializer.Serialize(resultado.Reservas);
                 TempData["Reservas"] = reservasJson;
 
@@ -423,7 +633,7 @@ namespace BookingMvcDotNet.Controllers
         }
 
         /// <summary>
-        /// Página de confirmación después de una compra exitosa.
+        /// Pï¿½gina de confirmaciï¿½n despuï¿½s de una compra exitosa.
         /// </summary>
         [HttpGet]
         public IActionResult ConfirmacionCompra()
@@ -461,19 +671,9 @@ namespace BookingMvcDotNet.Controllers
 
             // Obtener la compra con sus reservas
             // Admin puede ver cualquier factura, usuario solo las suyas
-            var query = _dbContext.Compras
-                .Include(c => c.Cliente)
-                .Include(c => c.ReservasCompra)
-                    .ThenInclude(rc => rc.Reserva)
-                        .ThenInclude(r => r.Servicio)
-                .Where(c => c.Id == compraId);
-
-            if (!isAdmin)
-            {
-                query = query.Where(c => c.ClienteId == clienteId.Value);
-            }
-
-            var compra = await query.FirstOrDefaultAsync();
+            var compra = await _integrationService.ObtenerCompraConReservasAsync(
+                compraId,
+                isAdmin ? null : clienteId.Value);
 
             if (compra == null)
                 return NotFound("Compra no encontrada");
@@ -494,55 +694,29 @@ namespace BookingMvcDotNet.Controllers
                 Total = compra.ValorPagado
             };
 
-            // Crear items de la factura basados en las reservas
-            factura.Items = compra.ReservasCompra.Select(rc => {
-                var servicio = rc.Reserva?.Servicio;
-                var tipoServicio = servicio?.TipoServicio.ToString() ?? "Servicio";
-                var tipo = tipoServicio switch
-                {
-                    "RentaVehiculos" => "CAR",
-                    "Hotel" => "HOTEL",
-                    "Aerolinea" => "FLIGHT",
-                    _ => "PACKAGE"
-                };
+            // Crear items de la factura basados en reservas activas
+            factura.Items = compra.ReservasCompra
+                .Where(rc => rc.Reserva?.Activa == true)
+                .Select(rc => {
+                    var reserva = rc.Reserva;
+                    var servicio = reserva?.Servicio;
+                    var tipo = servicio is null ? "PACKAGE" : MapTipoServicio(servicio.TipoServicio);
+                    var precioUnitario = (reserva?.ValorPagadoNegocio ?? 0m) + (reserva?.ComisionAgencia ?? 0m);
+                    return new FacturaItemViewModel
+                    {
+                        Descripcion = servicio?.Nombre ?? "Servicio de viaje",
+                        Tipo = tipo,
+                        CodigoReserva = reserva?.CodigoReserva ?? "-",
+                        Cantidad = 1,
+                        PrecioUnitario = precioUnitario
+                    };
+                }).ToList();
 
-                return new FacturaItemViewModel
-                {
-                    Descripcion = servicio?.Nombre ?? "Servicio de viaje",
-                    Tipo = tipo,
-                    CodigoReserva = rc.Reserva?.CodigoReserva ?? "-",
-                    Cantidad = 1,
-                    PrecioUnitario = 0 // Se calculará del total
-                };
-            }).ToList();
-
-            // Si no hay items, crear uno genérico
-            if (!factura.Items.Any())
-            {
-                factura.Items.Add(new FacturaItemViewModel
-                {
-                    Descripcion = "Servicios de viaje",
-                    Tipo = "PACKAGE",
-                    CodigoReserva = compraId.ToString(),
-                    Cantidad = 1,
-                    PrecioUnitario = compra.ValorPagado / 1.12m // Quitar IVA
-                });
-            }
-
-            // Calcular totales (el Total ya viene con IVA incluido)
+            // Calcular totales en base a reservas activas
             factura.PorcentajeIVA = 12m;
-            factura.Subtotal = compra.ValorPagado / 1.12m;
-            factura.IVA = compra.ValorPagado - factura.Subtotal;
-
-            // Distribuir el subtotal entre los items
-            if (factura.Items.Any())
-            {
-                var precioUnitario = factura.Subtotal / factura.Items.Count;
-                foreach (var item in factura.Items)
-                {
-                    item.PrecioUnitario = precioUnitario;
-                }
-            }
+            factura.Subtotal = factura.Items.Sum(i => i.Total);
+            factura.IVA = factura.Subtotal * (factura.PorcentajeIVA / 100m);
+            factura.Total = factura.Subtotal + factura.IVA;
 
             return View(factura);
         }
@@ -560,17 +734,11 @@ namespace BookingMvcDotNet.Controllers
             var model = new AdminDashboardViewModel();
 
             // Obtener clientes
-            var clientes = await _dbContext.Clientes.ToListAsync();
+            var clientes = await _integrationService.ObtenerClientesAsync() ?? new List<Cliente>();
             model.TotalClientes = clientes.Count;
 
             // Obtener compras con reservas
-            var compras = await _dbContext.Compras
-                .Include(c => c.Cliente)
-                .Include(c => c.ReservasCompra)
-                    .ThenInclude(rc => rc.Reserva)
-                        .ThenInclude(r => r.Servicio)
-                .OrderByDescending(c => c.FechaCompra)
-                .ToListAsync();
+            var compras = await _integrationService.ObtenerComprasAsync() ?? new List<Compra>();
 
             model.TotalCompras = compras.Count;
             model.IngresosTotales = compras.Sum(c => c.ValorPagado);
@@ -578,12 +746,7 @@ namespace BookingMvcDotNet.Controllers
             model.IngresosHoy = compras.Where(c => c.FechaCompra.Date == DateTime.Today).Sum(c => c.ValorPagado);
 
             // Obtener reservas
-            var reservas = await _dbContext.Reservas
-                .Include(r => r.Servicio)
-                .Include(r => r.ReservasCompra)
-                    .ThenInclude(rc => rc.Compra)
-                        .ThenInclude(c => c.Cliente)
-                .ToListAsync();
+            var reservas = await _integrationService.ObtenerReservasAsync() ?? new List<Reserva>();
 
             model.TotalReservas = reservas.Count;
             model.ReservasActivas = reservas.Count(r => r.Activa);
@@ -645,10 +808,7 @@ namespace BookingMvcDotNet.Controllers
             }).OrderByDescending(r => r.FechaCompra).ToList();
 
             // Obtener estado de proveedores
-            var servicios = await _dbContext.Servicios
-                .Include(s => s.DetallesServicio)
-                .Where(s => s.Activo)
-                .ToListAsync();
+            var servicios = await _integrationService.ObtenerServiciosActivosAsync() ?? new List<Servicio>();
 
             model.EstadoProveedores = servicios.Select(s => {
                 var detalleRest = s.DetallesServicio.FirstOrDefault(d => d.TipoProtocolo == TravelioDatabaseConnector.Enums.TipoProtocolo.Rest);
@@ -687,34 +847,19 @@ namespace BookingMvcDotNet.Controllers
 
             try
             {
-                var detalles = await _dbContext.DetallesServicio
-                    .Include(d => d.Servicio)
-                    .Where(d => d.ServicioId == servicioId)
-                    .ToListAsync();
-
-                var resultados = new List<object>();
-
-                foreach (var detalle in detalles)
+                var estados = await _integrationService.VerificarProveedoresAsync(servicioId);
+                if (estados is null)
                 {
-                    var url = $"{detalle.UriBase}{detalle.ObtenerProductosEndpoint}";
-                    var protocolo = detalle.TipoProtocolo.ToString();
-                    bool disponible = false;
-                    string mensaje = "";
-
-                    try
-                    {
-                        using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                        var response = await httpClient.GetAsync(url);
-                        disponible = response.IsSuccessStatusCode;
-                        mensaje = disponible ? "OK" : $"Error: {response.StatusCode}";
-                    }
-                    catch (Exception ex)
-                    {
-                        mensaje = $"Error: {ex.Message}";
-                    }
-
-                    resultados.Add(new { protocolo, url, disponible, mensaje });
+                    return Json(new { success = false, message = "No se pudo verificar los proveedores." });
                 }
+
+                var resultados = estados.Select(e => new
+                {
+                    protocolo = e.Protocolo,
+                    url = e.Url,
+                    disponible = e.Disponible,
+                    mensaje = e.Mensaje
+                });
 
                 return Json(new { success = true, resultados });
             }
@@ -736,12 +881,16 @@ namespace BookingMvcDotNet.Controllers
 
             try
             {
-                var reserva = await _dbContext.Reservas.FindAsync(reservaId);
-                if (reserva == null)
-                    return Json(new { success = false, message = "Reserva no encontrada" });
+                var resultado = await _integrationService.MarcarReservaComoCanceladaAsync(reservaId);
+                if (resultado is null)
+                {
+                    return Json(new { success = false, message = "No se pudo cancelar la reserva." });
+                }
 
-                reserva.Activa = false;
-                await _dbContext.SaveChangesAsync();
+                if (!resultado.Value)
+                {
+                    return Json(new { success = false, message = "Reserva no encontrada" });
+                }
 
                 return Json(new { success = true, message = "Reserva marcada como cancelada" });
             }
@@ -760,22 +909,17 @@ namespace BookingMvcDotNet.Controllers
             if (HttpContext.Session.GetString("IsAdmin") != "True")
                 return Unauthorized();
 
-            var comprasHoy = await _dbContext.Compras
-                .Where(c => c.FechaCompra.Date == DateTime.Today)
-                .SumAsync(c => c.ValorPagado);
+            var estadisticas = await _integrationService.ObtenerEstadisticasComprasAsync();
+            if (estadisticas is null)
+            {
+                return Json(new { hoy = 0m, semana = 0m, mes = 0m });
+            }
 
-            var comprasSemana = await _dbContext.Compras
-                .Where(c => c.FechaCompra >= DateTime.Today.AddDays(-7))
-                .SumAsync(c => c.ValorPagado);
-
-            var comprasMes = await _dbContext.Compras
-                .Where(c => c.FechaCompra >= DateTime.Today.AddMonths(-1))
-                .SumAsync(c => c.ValorPagado);
-
-            return Json(new { 
-                hoy = comprasHoy, 
-                semana = comprasSemana, 
-                mes = comprasMes 
+            return Json(new
+            {
+                hoy = estadisticas.Value.hoy,
+                semana = estadisticas.Value.semana,
+                mes = estadisticas.Value.mes
             });
         }
 
@@ -808,7 +952,7 @@ namespace BookingMvcDotNet.Controllers
                 Cantidad = 1
             };
 
-            // Añadir o incrementar
+            // Aï¿½adir o incrementar
             var existente = cart.FirstOrDefault(x => x.Tipo == nuevo.Tipo && x.Titulo == nuevo.Titulo);
             if (existente != null)
             {
@@ -820,7 +964,7 @@ namespace BookingMvcDotNet.Controllers
             }
 
             // Aplicar descuento por combinar productos en la misma ciudad
-            // Regla simple: 2 productos en la misma ciudad => 10% cada uno, 3 o más => 15%
+            // Regla simple: 2 productos en la misma ciudad => 10% cada uno, 3 o mï¿½s => 15%
             var ciudad = producto.Ciudad ?? string.Empty;
             var grupo = cart.Where(i => i.Detalle == ciudad).ToList();
             int grupoCount = grupo.Count;
@@ -857,21 +1001,49 @@ namespace BookingMvcDotNet.Controllers
             }
             catch { }
 
-            return Ok(new { success = true, message = "Añadido", totalCount = cart.Sum(x => x.Cantidad), recommendations = recomendaciones });
+            return Ok(new { success = true, message = "Aï¿½adido", totalCount = cart.Sum(x => x.Cantidad), recommendations = recomendaciones });
         }
 
         [HttpPost]
-        public IActionResult EliminarDelCarritoApi(string titulo)
+        public async Task<IActionResult> EliminarDelCarritoApi(string? titulo, int? cartId, string? tipo)
         {
             var cart =
                 HttpContext.Session.Get<List<CartItemViewModel>>(CART_SESSION_KEY)
                 ?? new List<CartItemViewModel>();
 
-            var item = cart.FirstOrDefault(x => x.Titulo == titulo);
+            CartItemViewModel? item = null;
+            if (cartId.HasValue)
+            {
+                item = cart.FirstOrDefault(x => x.CarritoItemId == cartId.Value);
+            }
 
+            if (item == null && !string.IsNullOrWhiteSpace(titulo))
+            {
+                item = cart.FirstOrDefault(x => x.Titulo == titulo);
+            }
+
+            var removed = false;
             if (item != null)
             {
                 cart.Remove(item);
+                removed = true;
+            }
+
+            if (cartId.HasValue)
+            {
+                var tipoServicio = MapTipoServicioFromCart(tipo);
+                if (tipoServicio.HasValue)
+                {
+                    var eliminado = await _integrationService.EliminarItemCarritoAsync(tipoServicio.Value, cartId.Value);
+                    if (eliminado == true)
+                    {
+                        removed = true;
+                    }
+                }
+            }
+
+            if (removed)
+            {
                 HttpContext.Session.Set(CART_SESSION_KEY, cart);
                 return Ok(new { success = true, newTotal = cart.Sum(x => x.Cantidad) });
             }
@@ -900,17 +1072,14 @@ namespace BookingMvcDotNet.Controllers
         }
 
         [HttpGet]
-        public IActionResult GetCartCount()
+        public async Task<IActionResult> GetCartCount()
         {
-            var cart =
-                HttpContext.Session.Get<List<CartItemViewModel>>(CART_SESSION_KEY)
-                ?? new List<CartItemViewModel>();
-
+            var cart = await ObtenerCarritoActualAsync();
             return Ok(new { count = cart.Sum(x => x.Cantidad) });
         }
 
         // ============================
-        //  VISTAS ESTÁTICAS
+        //  VISTAS ESTï¿½TICAS
         // ============================
         [HttpGet] public IActionResult Modules() => View();
         [HttpGet] public IActionResult Hoteles() => View();
@@ -922,3 +1091,4 @@ namespace BookingMvcDotNet.Controllers
         public IActionResult Error() => View(new ErrorViewModel());
     }
 }
+

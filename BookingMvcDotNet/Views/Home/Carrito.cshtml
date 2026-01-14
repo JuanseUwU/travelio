@@ -44,6 +44,8 @@
                             <li class="list-group-item p-4 d-flex align-items-center gap-3"
                                 data-role="line"
                                 data-title="@it.Titulo"
+                                data-cart-id="@it.CarritoItemId"
+                                data-item-type="@it.Tipo"
                                 data-unit-price="@it.PrecioFinal.ToString(CultureInfo.InvariantCulture)">
 
                                 @if (!string.IsNullOrEmpty(it.ImagenUrl))
@@ -244,9 +246,15 @@
                 fetch('/Home/ActualizarCantidadApi', { method: 'POST', body: fd });
             }
 
-            function syncDelete(title) {
-                let fd = new FormData(); fd.append('titulo', title);
-                fetch('/Home/EliminarDelCarritoApi', { method: 'POST', body: fd });
+            function syncDelete(title, cartId, tipo) {
+                let fd = new FormData();
+                if (cartId) {
+                    fd.append('cartId', cartId);
+                    fd.append('tipo', tipo || '');
+                } else {
+                    fd.append('titulo', title);
+                }
+                return fetch('/Home/EliminarDelCarritoApi', { method: 'POST', body: fd });
             }
 
             if (list) {
@@ -282,8 +290,12 @@
                             if (result.isConfirmed) {
                                 li.remove();
                                 recompute();
-                                syncDelete(title);
-                                if (!list.querySelector('[data-role="line"]')) location.reload();
+                                const cartId = li.getAttribute("data-cart-id");
+                                const tipo = li.getAttribute("data-item-type");
+                                syncDelete(title, cartId, tipo)
+                                    .finally(() => {
+                                        if (!list.querySelector('[data-role="line"]')) location.reload();
+                                    });
                             }
                         });
                     }

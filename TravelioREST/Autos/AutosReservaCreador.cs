@@ -7,19 +7,31 @@ using System.Text;
 namespace TravelioREST.Autos;
 
 
+//public class AutoReservaRequest
+//{
+//    public string id_auto { get; set; }
+//    public string id_hold { get; set; }
+//    public string nombre { get; set; }
+//    public string apellido { get; set; }
+//    public string tipo_identificacion { get; set; }
+//    public string identificacion { get; set; }
+//    public string correo { get; set; }
+//    public DateTime fecha_inicio { get; set; }
+//    public DateTime fecha_fin { get; set; }
+//}
+
 public class AutoReservaRequest
 {
-    public string id_auto { get; set; }
-    public string id_hold { get; set; }
-    public string nombre { get; set; }
-    public string apellido { get; set; }
-    public string tipo_identificacion { get; set; }
-    public string identificacion { get; set; }
-    public string correo { get; set; }
-    public DateTime fecha_inicio { get; set; }
-    public DateTime fecha_fin { get; set; }
+    public string IdAuto { get; set; }
+    public string IdHold { get; set; }
+    public string Nombre { get; set; }
+    public string Apellido { get; set; }
+    public string Correo { get; set; }
+    public string Identificacion { get; set; }
+    public DateTime FechaInicio { get; set; }
+    public DateTime FechaFin { get; set; }
+    public string TipoIdentificacion { get; set; }
 }
-
 
 /*
 public sealed class AutoReservaRequest
@@ -176,15 +188,15 @@ public static class AutosReservaCreador
     {
         var request = new AutoReservaRequest()
         {
-            id_auto = idAuto,
-            id_hold = idHold,
-            nombre = nombre,
-            apellido = apellido,
-            tipo_identificacion = tipoIdentificacion,
-            identificacion = identificacion,
-            correo = correo,
-            fecha_inicio = fechaInicio,
-            fecha_fin = fechaFin
+            IdAuto = idAuto,
+            IdHold = idHold,
+            Nombre = nombre,
+            Apellido = apellido,
+            TipoIdentificacion = tipoIdentificacion,
+            Identificacion = identificacion,
+            Correo = correo,
+            FechaInicio = fechaInicio,
+            FechaFin = fechaFin
         };
         var response = await Global.CachedHttpClient.PostAsJsonAsync(url, request);
         Debug.WriteLine($"{response.StatusCode}");

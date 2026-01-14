@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TravelioDatabaseConnector.Data;
 
@@ -11,9 +12,11 @@ using TravelioDatabaseConnector.Data;
 namespace TravelioDatabaseConnector.Migrations
 {
     [DbContext(typeof(TravelioDbContext))]
-    partial class TravelioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260113145301_MicroservicesUpdate3")]
+    partial class MicroservicesUpdate3
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -826,7 +829,7 @@ namespace TravelioDatabaseConnector.Migrations
                             RegistrarClienteEndpoint = "/usuarios/externo",
                             ServicioId = 5,
                             TipoProtocolo = "Rest",
-                            UriBase = "http://integrationcaribbean.runasp.net/api/v1/integracion/aerolinea"
+                            UriBase = "http://skyandes.runasp.net/api/integracion/aerolinea"
                         },
                         new
                         {
@@ -971,7 +974,7 @@ namespace TravelioDatabaseConnector.Migrations
                             RegistrarClienteEndpoint = "/usuarios/externos",
                             ServicioId = 105,
                             TipoProtocolo = "Rest",
-                            UriBase = "http://23.230.3.250:5000/api/integracion"
+                            UriBase = "http://23.230.3.250:8080/api/integracion"
                         },
                         new
                         {
@@ -1589,7 +1592,7 @@ namespace TravelioDatabaseConnector.Migrations
                         new
                         {
                             Id = 5,
-                            Activo = true,
+                            Activo = false,
                             Nombre = "Caribbean Skyways",
                             NumeroCuenta = "244",
                             TipoServicio = "Aerolinea"

@@ -1,6 +1,7 @@
 using BookingMvcDotNet.Services;
 using TravelioDatabaseConnector.Data;
 using Microsoft.EntityFrameworkCore;
+using TravelioIntegrator.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +28,7 @@ builder.Services.AddDbContext<TravelioDbContext>(options =>
     options.UseSqlServer(connectionString));
 
 // 3. SERVICIOS DE INTEGRACIÓN CON TRAVELIO
+builder.Services.AddScoped<TravelioIntegrationService>();
 builder.Services.AddScoped<IAutosService, AutosService>();
 builder.Services.AddScoped<IHotelesService, HotelesService>();
 builder.Services.AddScoped<IVuelosService, VuelosService>();

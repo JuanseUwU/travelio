@@ -33,9 +33,9 @@ public static class Connector
                 null,
                 null);
 
-            var paquetes = response.datos ?? Array.Empty<DatoPaquetes>();
+            var paquetes = response.datos ?? Array.Empty<DatoPaquetesListResponse>();
             return paquetes.Select(dto => new Paquete(
-                dto.idPaquete ?? string.Empty,
+                dto.idPaquete.ToString(),
                 dto.nombre ?? string.Empty,
                 dto.ciudad ?? string.Empty,
                 dto.pais ?? string.Empty,
@@ -119,7 +119,7 @@ public static class Connector
         if (IsREST && !forceSoap)
         {
             var usuario = await CrearUsuarioPaquetes.CrearUsuarioAsync(uri, correo, nombre, apellido);
-            return usuario.idUsuario ?? string.Empty;
+            return usuario.idUsuario.ToString();
         }
 
         var soapClient = new PaquetesServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -218,4 +218,7 @@ public static class Connector
         var cancelacion = await CancelarReservaPaquetes.CancelarReservaAsync(uri, idReserva);
         return (cancelacion.exito, cancelacion.valor_pasado);
     }
+
+    // Método de consulta
+    // ??
 }

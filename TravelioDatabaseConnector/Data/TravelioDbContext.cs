@@ -721,7 +721,7 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 501,
                 ServicioId = 1,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://aerolineaintrest.runasp.net/api/v1/integracion/aerolinea",
+                UriBase = "http://withflyintegration.runasp.net/api/v1/integracion/aerolinea",
                 ObtenerProductosEndpoint = "/search",
                 RegistrarClienteEndpoint = "/usuarios/externo",
                 ConfirmarProductoEndpoint = "/availability",
@@ -755,7 +755,7 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 502,
                 ServicioId = 2,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://astrawings.runasp.net/api/v1/integracion/aerolinea",
+                UriBase = "http://apintegraciona.runasp.net/api/v1/integracion/aerolinea",
                 ObtenerProductosEndpoint = "/search",
                 RegistrarClienteEndpoint = "/usuarios/externo",
                 ConfirmarProductoEndpoint = "/availability",
@@ -789,7 +789,7 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 503,
                 ServicioId = 3,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://skaywardair.runasp.net/api/v1/integracion/aerolinea",
+                UriBase = "http://skaywardairintegracion.runasp.net/api/v1/integracion/aerolinea",
                 ObtenerProductosEndpoint = "/search",
                 RegistrarClienteEndpoint = "/usuarios/externo",
                 ConfirmarProductoEndpoint = "/availability",
@@ -823,7 +823,7 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 504,
                 ServicioId = 4,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://skyandes.runasp.net/api/integracion/aerolinea",
+                UriBase = "https://skyandesintegration.runasp.net/api/v1/integracion/aerolinea",
                 ObtenerProductosEndpoint = "/search",
                 RegistrarClienteEndpoint = "/usuarios/externo",
                 ConfirmarProductoEndpoint = "/availability",
@@ -853,13 +853,12 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 ObtenerReservaEndpoint = ""
             },
 
-            // Enlaces incorrectos
             new DetalleServicio
             {
                 Id = 505,
                 ServicioId = 5,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://skyandes.runasp.net/api/integracion/aerolinea",
+                UriBase = "http://integrationcaribbean.runasp.net/api/v1/integracion/aerolinea",
                 ObtenerProductosEndpoint = "/search",
                 RegistrarClienteEndpoint = "/usuarios/externo",
                 ConfirmarProductoEndpoint = "/availability",
@@ -895,15 +894,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 601,
                 ServicioId = 101,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://hotelcampestrerest.runasp.net/api/v1/hoteles",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva", // Estas (API de Habitaciones de hotel) se obtienen añadiendo ?idReserva={el número consultado} al final el endpoint, como http://hotelcampestrerest.runasp.net/api/v1/hoteles/reserva?idReserva=1
-                CancelarReservaEndpoint = "/cancel"
+                UriBase = "https://apigateways-yefo.onrender.com/api/integracion",
+                ObtenerProductosEndpoint = "/habitaciones",
+                RegistrarClienteEndpoint = "/usuarios/externos",
+                ConfirmarProductoEndpoint = "/disponibilidad",
+                CrearPrerreservaEndpoint = "/prereserva",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas",
+                ObtenerReservaEndpoint = "/reservas", // Estas (API de Habitaciones de hotel) se obtienen añadiendo ?idReserva={el número consultado} al final el endpoint, como http://hotelcampestrerest.runasp.net/api/v1/hoteles/reserva?idReserva=1
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -929,15 +928,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 602,
                 ServicioId = 102,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://restallpahousenyc.runasp.net/api/v1/hoteles",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva",
-                CancelarReservaEndpoint = "/cancel"
+                UriBase = "https://apigateway-zebw.onrender.com/api/integracion",
+                ObtenerProductosEndpoint = "/habitaciones",
+                RegistrarClienteEndpoint = "/usuarios/externos",
+                ConfirmarProductoEndpoint = "/disponibilidad",
+                CrearPrerreservaEndpoint = "/prereserva",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas",
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -963,15 +962,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 603,
                 ServicioId = 103,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "https://reca.azurewebsites.net/api/v1/hoteles",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva",
-                CancelarReservaEndpoint = "/cancel"
+                UriBase = "https://hoteles-api-gateway-service.onrender.com/api/integracion",
+                ObtenerProductosEndpoint = "/habitaciones",
+                RegistrarClienteEndpoint = "/usuarios/externos",
+                ConfirmarProductoEndpoint = "/disponibilidad",
+                CrearPrerreservaEndpoint = "/prereserva",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas",
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -997,15 +996,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 604,
                 ServicioId = 104,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://restbrisamar.runasp.net/api/v1/hoteles",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva",
-                CancelarReservaEndpoint = "/cancel"
+                UriBase = "http://216.173.77.147:8080/api/integracion",
+                ObtenerProductosEndpoint = "/habitaciones",
+                RegistrarClienteEndpoint = "/usuarios/externos",
+                ConfirmarProductoEndpoint = "/disponibilidad",
+                CrearPrerreservaEndpoint = "/prereserva",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas",
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -1031,15 +1030,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 605,
                 ServicioId = 105,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://restallpahousenyc.runasp.net/api/v1/hoteles",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva",
-                CancelarReservaEndpoint = "/cancel"
+                UriBase = "http://23.230.3.250:5000/api/integracion",
+                ObtenerProductosEndpoint = "/habitaciones",
+                RegistrarClienteEndpoint = "/usuarios/externos",
+                ConfirmarProductoEndpoint = "/disponibilidad",
+                CrearPrerreservaEndpoint = "/prereserva",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas",
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -1065,15 +1064,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 606,
                 ServicioId = 106,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://aureacuenrest.runasp.net/api/v1/hoteles",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios/externo",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
-                ObtenerReservaEndpoint = "/reserva",
-                CancelarReservaEndpoint = "/cancel"
+                UriBase = "https://apigateway-hyaw.onrender.com/api/integracion",
+                ObtenerProductosEndpoint = "/habitaciones",
+                RegistrarClienteEndpoint = "/usuarios/externos",
+                ConfirmarProductoEndpoint = "/disponibilidad",
+                CrearPrerreservaEndpoint = "/prereserva",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas",
+                ObtenerReservaEndpoint = "/reservas",
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -1101,14 +1100,14 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 701,
                 ServicioId = 201,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://cuencautosinte.runasp.net/api/v1",
+                UriBase = "https://cuencaintegracion.runasp.net/api/v1",
                 ObtenerProductosEndpoint = "/integracion/autos/search",
                 RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
                 ConfirmarProductoEndpoint = "/integracion/autos/availability",
-                CrearPrerreservaEndpoint = "/integracion/autos/hold",
+                CrearPrerreservaEndpoint = "/prereserva/auto",
                 CrearReservaEndpoint = "/integracion/autos/book",
                 GenerarFacturaEndpoint = "/integracion/autos/invoices",
-                ObtenerReservaEndpoint = "/integracion/autos/reserva", // Estas (API de Renta de Autos) se obtienen añadiendo el número consultado al final el endpoint, como http://cuencautosinte.runasp.net/api/v1/integracion/autos/reservas/1
+                ObtenerReservaEndpoint = "/integracion/autos/reservas", // Estas (API de Renta de Autos) se obtienen añadiendo el número consultado al final el endpoint, como http://cuencautosinte.runasp.net/api/v1/integracion/autos/reservas/1
                 CancelarReservaEndpoint = "/CancelarAuto"
             },
 
@@ -1135,14 +1134,14 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 702,
                 ServicioId = 202,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://restintegracin.runasp.net/api/v1",
+                UriBase = "https://integracionbooking.runasp.net/api/v1",
                 ObtenerProductosEndpoint = "/integracion/autos/search",
                 RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
                 ConfirmarProductoEndpoint = "/integracion/autos/availability",
-                CrearPrerreservaEndpoint = "/integracion/autos/hold",
+                CrearPrerreservaEndpoint = "/prereserva/auto",
                 CrearReservaEndpoint = "/integracion/autos/book",
                 GenerarFacturaEndpoint = "/integracion/autos/invoices",
-                ObtenerReservaEndpoint = "/integracion/autos/reserva",
+                ObtenerReservaEndpoint = "/integracion/autos/reservas",
                 CancelarReservaEndpoint = "/CancelarAuto"
             },
 
@@ -1169,14 +1168,14 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 703,
                 ServicioId = 203,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://integracionrest.runasp.net/api/v1",
+                UriBase = "http://easycarmicroint.runasp.net/api/v1",
                 ObtenerProductosEndpoint = "/integracion/autos/search",
                 RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
                 ConfirmarProductoEndpoint = "/integracion/autos/availability",
-                CrearPrerreservaEndpoint = "/integracion/autos/hold",
+                CrearPrerreservaEndpoint = "/prereserva/auto",
                 CrearReservaEndpoint = "/integracion/autos/book",
                 GenerarFacturaEndpoint = "/integracion/autos/invoices",
-                ObtenerReservaEndpoint = "/integracion/autos/reserva",
+                ObtenerReservaEndpoint = "/integracion/autos/reservas",
                 CancelarReservaEndpoint = "/CancelarAuto"
             },
 
@@ -1203,14 +1202,14 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 704,
                 ServicioId = 204,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://autocarent.runasp.net/api/v1",
+                UriBase = "https://apigatewaybooking.runasp.net/api/v1",
                 ObtenerProductosEndpoint = "/integracion/autos/search",
                 RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
                 ConfirmarProductoEndpoint = "/integracion/autos/availability",
-                CrearPrerreservaEndpoint = "/integracion/autos/hold",
+                CrearPrerreservaEndpoint = "/prereserva/auto",
                 CrearReservaEndpoint = "/integracion/autos/book",
                 GenerarFacturaEndpoint = "/integracion/autos/invoices",
-                ObtenerReservaEndpoint = "/integracion/autos/reserva",
+                ObtenerReservaEndpoint = "/integracion/autos/reservas",
                 CancelarReservaEndpoint = "/CancelarAuto"
             },
 
@@ -1237,15 +1236,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 705,
                 ServicioId = 205,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://restinte.runasp.net/api",
-                ObtenerProductosEndpoint = "/v2/integracion/autos/search",
-                RegistrarClienteEndpoint = "/v1/integracion/autos/usuarios/externo",
-                ConfirmarProductoEndpoint = "/v2/integracion/autos/availability",
-                CrearPrerreservaEndpoint = "/v1/integracion/autos/hold",
-                CrearReservaEndpoint = "/v1/integracion/autos/book",
-                GenerarFacturaEndpoint = "/v1/integracion/autos/invoices",
-                ObtenerReservaEndpoint = "/v2/prereserva/auto",
-                CancelarReservaEndpoint = "v1/CancelarAuto"
+                UriBase = "https://guayaquilintegracion.runasp.net/api/v1",
+                ObtenerProductosEndpoint = "/integracion/autos/search",
+                RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
+                ConfirmarProductoEndpoint = "/integracion/autos/availability",
+                CrearPrerreservaEndpoint = "/prereserva/auto",
+                CrearReservaEndpoint = "/integracion/autos/book",
+                GenerarFacturaEndpoint = "/integracion/autos/invoices",
+                ObtenerReservaEndpoint = "/integracion/autos/reservas",
+                CancelarReservaEndpoint = "/CancelarAuto"
             },
 
 
@@ -1271,14 +1270,14 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 706,
                 ServicioId = 206,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://urbandriveinterest.runasp.net/api/v1",
+                UriBase = "https://gatewaybooking.runasp.net/api/v1",
                 ObtenerProductosEndpoint = "/integracion/autos/search",
                 RegistrarClienteEndpoint = "/integracion/autos/usuarios/externo",
                 ConfirmarProductoEndpoint = "/integracion/autos/availability",
-                CrearPrerreservaEndpoint = "/integracion/autos/hold",
+                CrearPrerreservaEndpoint = "/prereserva/auto",
                 CrearReservaEndpoint = "/integracion/autos/book",
                 GenerarFacturaEndpoint = "/integracion/autos/invoices",
-                ObtenerReservaEndpoint = "/prereserva/auto",
+                ObtenerReservaEndpoint = "/integracion/autos/reservas",
                 CancelarReservaEndpoint = "/CancelarAuto"
             },
 
@@ -1307,7 +1306,7 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 801,
                 ServicioId = 301,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "https://worldagencybk.runasp.net/api/v2/paquetes",
+                UriBase = "https://worldagencyint.runasp.net/api/v2/paquetes",
                 ObtenerProductosEndpoint = "",
                 RegistrarClienteEndpoint = "/usuarios/externo",
                 ConfirmarProductoEndpoint = "/availability",
@@ -1377,7 +1376,7 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 803,
                 ServicioId = 303,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://paquetesturisticosweb-bk.runasp.net/api/v2/paquetes",
+                UriBase = "http://paquetesturisticosweb.runasp.net/api/v2/paquetes",
                 ObtenerProductosEndpoint = "",
                 RegistrarClienteEndpoint = "/usuarios/externo",
                 ConfirmarProductoEndpoint = "/availability",
@@ -1413,15 +1412,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 901,
                 ServicioId = 401,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://cangrejitosfelices.runasp.net/api/v1/integracion/restaurantes",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
+                UriBase = "http://microcangrejitosfelices.runasp.net/api",
+                ObtenerProductosEndpoint = "/mesas/buscar",
+                RegistrarClienteEndpoint = "/usuarios/registrar",
+                ConfirmarProductoEndpoint = "/reservas/disponibilidad",
+                CrearPrerreservaEndpoint = "/reservas/hold",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas/emitir",
                 ObtenerReservaEndpoint = "/reservas", // Estas (API de Mesas) se obtienen añadiendo el número consultado al final el endpoint, como http://cangrejitosfelices.runasp.net/api/v1/integracion/restaurantes/reservas/9
-                CancelarReservaEndpoint = "/cancelar"
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -1447,20 +1446,21 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 902,
                 ServicioId = 402,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://dragonrojobus.runasp.net/api/v1/integracion/restaurantes",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
+                UriBase = "http://microdragonrojo.runasp.net/api",
+                ObtenerProductosEndpoint = "/mesas/buscar",
+                RegistrarClienteEndpoint = "/usuarios/registrar",
+                ConfirmarProductoEndpoint = "/reservas/disponibilidad",
+                CrearPrerreservaEndpoint = "/reservas/hold",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas/emitir",
                 ObtenerReservaEndpoint = "/reservas",
-                CancelarReservaEndpoint = "/cancelar"
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
 
             // Arturo Albuja
+            // No funciona API Gateway REST
 
             new DetalleServicio
             {
@@ -1481,15 +1481,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 903,
                 ServicioId = 403,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://cafesanjuan.runasp.net/api/integracion/restaurantes",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
+                UriBase = "https://apigateway-production1.up.railway.app/api",
+                ObtenerProductosEndpoint = "/mesas/buscar",
+                RegistrarClienteEndpoint = "/usuarios/registrar",
+                ConfirmarProductoEndpoint = "/reservas/disponibilidad",
+                CrearPrerreservaEndpoint = "/reservas/hold",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas/emitir",
                 ObtenerReservaEndpoint = "/reservas",
-                CancelarReservaEndpoint = "/cancelar"
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -1515,15 +1515,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 904,
                 ServicioId = 404,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://sanctum.runasp.net/api/v1/integracion/restaurantes",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
+                UriBase = "http://microsanctum.runasp.net/api",
+                ObtenerProductosEndpoint = "/mesas/buscar",
+                RegistrarClienteEndpoint = "/usuarios/registrar",
+                ConfirmarProductoEndpoint = "/reservas/disponibilidad",
+                CrearPrerreservaEndpoint = "/reservas/hold",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas/emitir",
                 ObtenerReservaEndpoint = "/reservas",
-                CancelarReservaEndpoint = "/cancelar"
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -1549,15 +1549,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 905,
                 ServicioId = 405,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://saborandino.runasp.net/api/v1/integracion/restaurantes",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
+                UriBase = "http://microsaborandino.runasp.net/api",
+                ObtenerProductosEndpoint = "/mesas/buscar",
+                RegistrarClienteEndpoint = "/usuarios/registrar",
+                ConfirmarProductoEndpoint = "/reservas/disponibilidad",
+                CrearPrerreservaEndpoint = "/reservas/hold",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas/emitir",
                 ObtenerReservaEndpoint = "/reservas",
-                CancelarReservaEndpoint = "/cancelar"
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -1583,15 +1583,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 906,
                 ServicioId = 406,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://ingtegracion-bar-sinson.runasp.net/api/v1/integracion/restaurantes",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
+                UriBase = "http://microbarsinson.runasp.net/api",
+                ObtenerProductosEndpoint = "/mesas/buscar",
+                RegistrarClienteEndpoint = "/usuarios/registrar",
+                ConfirmarProductoEndpoint = "/reservas/disponibilidad",
+                CrearPrerreservaEndpoint = "/reservas/hold",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas/emitir",
                 ObtenerReservaEndpoint = "/reservas",
-                CancelarReservaEndpoint = "/cancelar"
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
 
 
@@ -1617,15 +1617,15 @@ public class TravelioDbContext(DbContextOptions<TravelioDbContext> options) : Db
                 Id = 907,
                 ServicioId = 407,
                 TipoProtocolo = TipoProtocolo.Rest,
-                UriBase = "http://7maresback.runasp.net/api/v1/integracion/restaurantes",
-                ObtenerProductosEndpoint = "/search",
-                RegistrarClienteEndpoint = "/usuarios",
-                ConfirmarProductoEndpoint = "/availability",
-                CrearPrerreservaEndpoint = "/hold",
-                CrearReservaEndpoint = "/book",
-                GenerarFacturaEndpoint = "/invoices",
+                UriBase = "http://micro7mares.runasp.net/api",
+                ObtenerProductosEndpoint = "/mesas/buscar",
+                RegistrarClienteEndpoint = "/usuarios/registrar",
+                ConfirmarProductoEndpoint = "/reservas/disponibilidad",
+                CrearPrerreservaEndpoint = "/reservas/hold",
+                CrearReservaEndpoint = "/reservas/confirmar",
+                GenerarFacturaEndpoint = "/facturas/emitir",
                 ObtenerReservaEndpoint = "/reservas",
-                CancelarReservaEndpoint = "/cancelar"
+                CancelarReservaEndpoint = "/reservas/cancelar"
             },
         };
 

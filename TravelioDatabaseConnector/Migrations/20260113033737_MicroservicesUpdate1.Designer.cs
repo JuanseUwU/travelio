@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TravelioDatabaseConnector.Data;
 
@@ -11,9 +12,11 @@ using TravelioDatabaseConnector.Data;
 namespace TravelioDatabaseConnector.Migrations
 {
     [DbContext(typeof(TravelioDbContext))]
-    partial class TravelioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260113033737_MicroservicesUpdate1")]
+    partial class MicroservicesUpdate1
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -826,7 +829,7 @@ namespace TravelioDatabaseConnector.Migrations
                             RegistrarClienteEndpoint = "/usuarios/externo",
                             ServicioId = 5,
                             TipoProtocolo = "Rest",
-                            UriBase = "http://integrationcaribbean.runasp.net/api/v1/integracion/aerolinea"
+                            UriBase = "http://skyandes.runasp.net/api/integracion/aerolinea"
                         },
                         new
                         {
@@ -884,7 +887,7 @@ namespace TravelioDatabaseConnector.Migrations
                             RegistrarClienteEndpoint = "/usuarios/externos",
                             ServicioId = 102,
                             TipoProtocolo = "Rest",
-                            UriBase = "https://apigateway-zebw.onrender.com/api/integracion"
+                            UriBase = "https://apigateway-hyaw.onrender.com/api/integracion"
                         },
                         new
                         {
@@ -913,7 +916,7 @@ namespace TravelioDatabaseConnector.Migrations
                             RegistrarClienteEndpoint = "/usuarios/externos",
                             ServicioId = 103,
                             TipoProtocolo = "Rest",
-                            UriBase = "https://hoteles-api-gateway-service.onrender.com/api/integracion"
+                            UriBase = "https://reca.azurewebsites.net/api/v1/hoteles"
                         },
                         new
                         {
@@ -942,7 +945,7 @@ namespace TravelioDatabaseConnector.Migrations
                             RegistrarClienteEndpoint = "/usuarios/externos",
                             ServicioId = 104,
                             TipoProtocolo = "Rest",
-                            UriBase = "http://216.173.77.147:8080/api/integracion"
+                            UriBase = "http://restbrisamar.runasp.net/api/v1/hoteles"
                         },
                         new
                         {
@@ -971,7 +974,7 @@ namespace TravelioDatabaseConnector.Migrations
                             RegistrarClienteEndpoint = "/usuarios/externos",
                             ServicioId = 105,
                             TipoProtocolo = "Rest",
-                            UriBase = "http://23.230.3.250:5000/api/integracion"
+                            UriBase = "http://restallpahousenyc.runasp.net/api/v1/hoteles"
                         },
                         new
                         {

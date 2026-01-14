@@ -11,7 +11,7 @@ internal static class ConnectionTest
     public static async Task TestBasicGetConnection()
     {
         Console.WriteLine($"Probando {(Global.IsREST ? "REST" : "SOAP")}");
-        const string restGetCarsUri = @"http://cuencautosinte.runasp.net/api/v2/integracion/autos/search";
+        const string restGetCarsUri = @"https://cuencaintegracion.runasp.net/api/v1/integracion/autos/search";
         const string soapGetCarsUri = @"http://cuencautosrenta.runasp.net/WS_BuscarAutos.asmx?WSDL";
         var getCarsUri = Global.IsREST ? restGetCarsUri : soapGetCarsUri;
         //var autos = await Connector.GetVehiculosAsync(getCarsUri, categoria: "SUV", capacidad: 5, precioMax: 100);
@@ -25,7 +25,7 @@ internal static class ConnectionTest
 
         Console.WriteLine("Comprobación de disponibilidad:");
 
-        const string restCheckAvailabilityUri = @"http://cuencautosinte.runasp.net/api/v2/integracion/autos/availability";
+        const string restCheckAvailabilityUri = @"https://cuencaintegracion.runasp.net/api/v1/integracion/autos/availability";
         const string soapCheckAvailabilityUri = @"http://cuencautosrenta.runasp.net/WS_DisponibilidadAutos.asmx?WSDL";
 
         var checkAvailabilityUri = Global.IsREST ? restCheckAvailabilityUri : soapCheckAvailabilityUri;

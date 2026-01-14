@@ -18,14 +18,14 @@ public static class Connector
         {
             var mesasRest = await MesasList.GetMesasListAsync(uri, capacidad, tipoMesa, estado);
             return Array.ConvertAll(mesasRest, m => new Mesa(
-                m.IdMesa,
+                m.idMesa,
                 0,
-                m.NumeroMesa,
-                m.TipoMesa ?? string.Empty,
-                m.Capacidad,
-                m.Precio,
-                m.ImagenURL ?? string.Empty,
-                m.Estado ?? string.Empty));
+                m.numeroMesa,
+                m.tipoMesa ?? string.Empty,
+                m.capacidad,
+                m.precio,
+                m.imagenURL ?? string.Empty,
+                m.estado ?? string.Empty));
         }
 
         var soapClient = new BusBusquedaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -47,7 +47,7 @@ public static class Connector
     {
         if (IsREST && !forceSoap)
         {
-            return await VerificarDisponibilidadMesas.VerificarAsync(uri, idMesa, numeroPersonas);
+            return await VerificarDisponibilidadMesas.VerificarAsync(uri, idMesa, fecha, numeroPersonas);
         }
 
         var soapClient = new BusDisponibilidadWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -66,7 +66,7 @@ public static class Connector
         if (IsREST && !forceSoap)
         {
             var hold = await MesaHold.CrearMesaHoldAsync(uri, idMesa.ToString(), fecha, personas, duracionHoldSegundos);
-            return (hold.id_hold, DateTime.UtcNow.AddSeconds(duracionHoldSegundos));
+            return (hold.idHold, DateTime.UtcNow.AddSeconds(duracionHoldSegundos));
         }
 
         var soapClient = new BusReservaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -115,8 +115,8 @@ public static class Connector
                 nombre,
                 apellido,
                 correo,
-                reserva.valor_pagado,
-                reserva.uri_factura ?? string.Empty);
+                reserva.valorPagado,
+                reserva.uriFactura ?? string.Empty);
         }
 
         var soapClient = new BusReservaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -156,16 +156,16 @@ public static class Connector
             return new Reserva(
                 string.Empty,
                 idReserva.ToString(),
-                int.TryParse(datos.numero_mesa, out var idMesa) ? idMesa : 0,
+                int.TryParse(datos.idMesa, out var idMesa) ? idMesa : 0,
                 datos.fecha,
-                datos.numero_personas,
+                datos.numeroPersonas,
                 string.Empty,
-                datos.tipo ?? string.Empty,
-                datos.nombre ?? string.Empty,
-                datos.apellido ?? string.Empty,
+                datos.tipoIdentificacion ?? string.Empty,
+                datos.nombreCliente ?? string.Empty,
+                datos.apellidoCliente ?? string.Empty,
                 datos.correo ?? string.Empty,
-                datos.valor_pagado,
-                datos.uri_factura ?? string.Empty);
+                datos.valorPagado,
+                datos.uriFactura ?? string.Empty);
         }
 
         var soapClient = new BusReservaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -200,7 +200,7 @@ public static class Connector
         if (IsREST && !forceSoap)
         {
             var factura = await MesaFactura.CrearMesaFacturaAsync(uri, idReserva, correo, nombre, identificacion, valor, tipoIdentificacion);
-            return factura.uri_factura ?? throw new InvalidOperationException("No se pudo generar la factura.");
+            return factura.uriFactura ?? throw new InvalidOperationException("No se pudo generar la factura.");
         }
 
         var soapClient = new BusFacturaWSSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -211,6 +211,6 @@ public static class Connector
     public static async Task<(bool exito, decimal valorPagado)> CancelarReservaAsync(string uri, string idReserva)
     {
         var cancelar = await MesaCancelarReserva.CancelarMesaReservaAsync(uri, idReserva);
-        return (cancelar.exito, cancelar.valor_pagado);
+        return (cancelar.exito, cancelar.valorPagado);
     }
 }

@@ -1,6 +1,9 @@
 using BookingMvcDotNet.Models;
 using BookingMvcDotNet.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using TravelioIntegrator.Models.Carrito;
+using TravelioIntegrator.Services;
 
 namespace BookingMvcDotNet.Controllers;
 
@@ -8,7 +11,7 @@ namespace BookingMvcDotNet.Controllers;
 /// Controlador para el módulo de renta de autos.
 /// Conecta con 6 proveedores SOAP/REST: Cuenca Wheels, LojitaGO, EasyCar, Auto Car Rent, RentaAutosGYE, UrbanDrive NY
 /// </summary>
-public class AutosController(IAutosService autosService, ILogger<AutosController> logger) : Controller
+public class AutosController(IAutosService autosService, TravelioIntegrationService integrationService, ILogger<AutosController> logger) : Controller
 {
     private const string CART_SESSION_KEY = "MyCartSession";
 
@@ -91,25 +94,71 @@ public class AutosController(IAutosService autosService, ILogger<AutosController
             
             if (existente != null)
             {
-                return Json(new { success = false, message = "Este vehículo ya está en tu carrito" });
+                return Json(new { success = false, message = "Este vehiculo ya esta en tu carrito" });
             }
 
-            cart.Add(new CartItemViewModel
+            var clienteId = HttpContext.Session.GetInt32("ClienteId");
+            var clienteIdValue = clienteId.GetValueOrDefault();
+            var guardarEnDb = clienteIdValue > 0;
+            if (guardarEnDb)
+            {
+                var existentesDb = await integrationService.ObtenerCarritoAutosAsync(clienteIdValue);
+                if (existentesDb?.Any(x =>
+                        x.ServicioId == servicioId &&
+                        x.IdAutoProveedor == idAuto &&
+                        x.FechaInicio.Date == fechaInicio.Date &&
+                        x.FechaFin.Date == fechaFin.Date) == true)
+                {
+                    return Json(new { success = false, message = "Este vehiculo ya esta en tu carrito" });
+                }
+            }
+
+            var nuevo = new CartItemViewModel
             {
                 Tipo = "CAR",
                 ServicioId = servicioId,
                 IdProducto = idAuto,
                 Titulo = $"{auto.Tipo} - {auto.NombreProveedor}",
-                Detalle = $"{auto.Ciudad}, {auto.Pais} | {fechaInicio:dd/MM/yyyy} - {fechaFin:dd/MM/yyyy} ({dias} días)",
+                Detalle = $"{auto.Ciudad}, {auto.Pais} | {fechaInicio:dd/MM/yyyy} - {fechaFin:dd/MM/yyyy} ({dias} dias)",
                 FechaInicio = fechaInicio,
                 FechaFin = fechaFin,
                 ImagenUrl = auto.UriImagen,
                 PrecioOriginal = auto.PrecioNormalPorDia * dias,
                 PrecioFinal = auto.PrecioActualPorDia * dias,
                 PrecioUnitario = auto.PrecioActualPorDia,
-                UnidadPrecio = "por día",
+                UnidadPrecio = "por dia",
                 Cantidad = 1
-            });
+            };
+
+            if (guardarEnDb)
+            {
+                var request = new AutoCarritoRequest(
+                    clienteIdValue,
+                    servicioId,
+                    idAuto,
+                    auto.Tipo,
+                    null,
+                    null,
+                    auto.CapacidadPasajeros,
+                    auto.PrecioNormalPorDia,
+                    auto.PrecioActualPorDia,
+                    auto.DescuentoPorcentaje,
+                    string.IsNullOrWhiteSpace(auto.UriImagen) ? null : auto.UriImagen,
+                    auto.Ciudad,
+                    auto.Pais,
+                    fechaInicio,
+                    fechaFin);
+
+                var dbItem = await integrationService.AgregarAutoACarritoAsync(request, logger);
+                if (dbItem == null)
+                {
+                    return Json(new { success = false, message = "No se pudo guardar el vehiculo en tu carrito" });
+                }
+
+                nuevo.CarritoItemId = dbItem.Id;
+            }
+
+            cart.Add(nuevo);
 
             HttpContext.Session.Set(CART_SESSION_KEY, cart);
 

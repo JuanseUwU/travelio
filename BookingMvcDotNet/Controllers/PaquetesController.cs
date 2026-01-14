@@ -1,17 +1,22 @@
 using BookingMvcDotNet.Models;
 using BookingMvcDotNet.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using TravelioIntegrator.Models.Carrito;
+using TravelioIntegrator.Services;
 
 namespace BookingMvcDotNet.Controllers;
 
 public class PaquetesController : Controller
 {
     private readonly IPaquetesService _paquetesService;
+    private readonly TravelioIntegrationService _integrationService;
     private const string CART_SESSION_KEY = "MyCartSession";
 
-    public PaquetesController(IPaquetesService paquetesService)
+    public PaquetesController(IPaquetesService paquetesService, TravelioIntegrationService integrationService)
     {
         _paquetesService = paquetesService;
+        _integrationService = integrationService;
     }
 
     [HttpGet]
@@ -78,16 +83,32 @@ public class PaquetesController : Controller
 
         if (existente != null)
         {
-            return Json(new { success = false, message = "Este paquete ya está en tu carrito" });
+            return Json(new { success = false, message = "Este paquete ya esta en tu carrito" });
         }
 
-        cart.Add(new CartItemViewModel
+        var clienteId = HttpContext.Session.GetInt32("ClienteId");
+        var clienteIdValue = clienteId.GetValueOrDefault();
+        var guardarEnDb = clienteIdValue > 0;
+        if (guardarEnDb)
+        {
+            var existentesDb = await _integrationService.ObtenerCarritoPaquetesAsync(clienteIdValue);
+            if (existentesDb?.Any(x =>
+                    x.ServicioId == servicioId &&
+                    x.IdPaqueteProveedor == idPaquete &&
+                    x.FechaInicio.Date == fechaInicio.Date &&
+                    x.Personas == personas) == true)
+            {
+                return Json(new { success = false, message = "Este paquete ya esta en tu carrito" });
+            }
+        }
+
+        var nuevo = new CartItemViewModel
         {
             Tipo = "PACKAGE",
             IdProducto = idPaquete,
             ServicioId = servicioId,
             Titulo = paquete.Nombre,
-            Detalle = $"{paquete.Ciudad}, {paquete.Pais} | {paquete.TipoActividad} | {paquete.Duracion} días",
+            Detalle = $"{paquete.Ciudad}, {paquete.Pais} | {paquete.TipoActividad} | {paquete.Duracion} dias",
             ImagenUrl = paquete.ImagenUrl,
             PrecioOriginal = paquete.PrecioNormal * personas,
             PrecioFinal = precioTotal,
@@ -97,7 +118,39 @@ public class PaquetesController : Controller
             FechaFin = fechaFin,
             NumeroPersonas = personas,
             UnidadPrecio = $"({personas} personas)"
-        });
+        };
+
+        if (guardarEnDb)
+        {
+            var bookingUserId = HttpContext.Session.GetString("UserEmail") ?? $"cliente-{clienteIdValue}";
+            var request = new PaqueteCarritoRequest(
+                clienteIdValue,
+                servicioId,
+                idPaquete,
+                paquete.Nombre,
+                paquete.Ciudad,
+                paquete.Pais,
+                paquete.TipoActividad,
+                paquete.Capacidad,
+                paquete.PrecioNormal,
+                paquete.PrecioActual,
+                string.IsNullOrWhiteSpace(paquete.ImagenUrl) ? null : paquete.ImagenUrl,
+                paquete.Duracion,
+                fechaInicio,
+                personas,
+                bookingUserId,
+                Array.Empty<PaqueteTuristaRequest>());
+
+            var dbItem = await _integrationService.AgregarPaqueteACarritoAsync(request);
+            if (dbItem == null)
+            {
+                return Json(new { success = false, message = "No se pudo guardar el paquete en tu carrito" });
+            }
+
+            nuevo.CarritoItemId = dbItem.Id;
+        }
+
+        cart.Add(nuevo);
 
         HttpContext.Session.Set(CART_SESSION_KEY, cart);
 

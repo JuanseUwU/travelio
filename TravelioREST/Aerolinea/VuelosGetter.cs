@@ -8,35 +8,58 @@ using static TravelioREST.Global;
 
 namespace TravelioREST.Aerolinea;
 
+//public class ConsultaVuelosResponse
+//{
+//    public int count { get; set; }
+//    public FlightConsulta[] flights { get; set; }
+//    public _LinksConsultaVuelos _links { get; set; }
+//}
+
+//public class _LinksConsultaVuelos
+//{
+//    public string self { get; set; }
+//    public string hold { get; set; }
+//    public string availability { get; set; }
+//    public string book { get; set; }
+//}
+
+//public class FlightConsulta
+//{
+//    public int IdVuelo { get; set; }
+//    public string Origen { get; set; }
+//    public string Destino { get; set; }
+//    public DateTime FechaSalida { get; set; }
+//    public DateTime FechaLlegada { get; set; }
+//    public string TipoCabina { get; set; }
+//    public int Pasajeros { get; set; }
+//    public string NombreAerolinea { get; set; }
+//    public decimal PrecioNormal { get; set; }
+//    public decimal PrecioActual { get; set; }
+//    public string Moneda { get; set; }
+//    public int CapacidadDisponible { get; set; }
+//}
+
 public class ConsultaVuelosResponse
 {
-    public int count { get; set; }
-    public FlightConsulta[] flights { get; set; }
-    public _LinksConsultaVuelos _links { get; set; }
-}
-
-public class _LinksConsultaVuelos
-{
-    public string self { get; set; }
-    public string hold { get; set; }
-    public string availability { get; set; }
-    public string book { get; set; }
+    public bool success { get; set; }
+    public string message { get; set; }
+    public FlightConsulta[] data { get; set; }
+    public string[] errors { get; set; }
+    public DateTime timestamp { get; set; }
 }
 
 public class FlightConsulta
 {
-    public int IdVuelo { get; set; }
-    public string Origen { get; set; }
-    public string Destino { get; set; }
-    public DateTime FechaSalida { get; set; }
-    public DateTime FechaLlegada { get; set; }
-    public string TipoCabina { get; set; }
-    public int Pasajeros { get; set; }
-    public string NombreAerolinea { get; set; }
-    public decimal PrecioNormal { get; set; }
-    public decimal PrecioActual { get; set; }
-    public string Moneda { get; set; }
-    public int CapacidadDisponible { get; set; }
+    public string idVuelo { get; set; }
+    public string origen { get; set; }
+    public string destino { get; set; }
+    public DateTime fecha { get; set; }
+    public string tipoCabina { get; set; }
+    public int capacidadPasajeros { get; set; }
+    public string nombreAerolinea { get; set; }
+    public int capacidadActual { get; set; }
+    public decimal precioNormal { get; set; }
+    public decimal precioActual { get; set; }
 }
 
 
@@ -49,8 +72,8 @@ public static class VuelosGetter
         DateTime? dateTo = null,
         string? cabin = null,
         int? pasajeros = null,
-        string? sort = null,
-        string? moneda = null)
+        decimal? precio_min = null,
+        decimal? precio_max = null)
     {
         var uriBuilder = new UriBuilder(baseUri);
 
@@ -63,10 +86,10 @@ public static class VuelosGetter
             query["to"] = Uri.EscapeDataString(to);
 
         if (dateFrom.HasValue)
-            query["dateFrom"] = dateFrom.ToString();
+            query["date_from"] = dateFrom.ToString();
 
         if (dateTo.HasValue)
-            query["dateTo"] = dateTo.ToString();
+            query["date_to"] = dateTo.ToString();
 
         if (!string.IsNullOrEmpty(cabin))
             query["cabin"] = Uri.EscapeDataString(cabin);
@@ -74,17 +97,17 @@ public static class VuelosGetter
         if (pasajeros.HasValue)
             query["pasajeros"] = pasajeros.ToString();
 
-        if (!string.IsNullOrEmpty(sort))
-            query["sort"] = Uri.EscapeDataString(sort);
+        if (precio_min.HasValue)
+            query["precio_min"] = precio_min.ToString();
 
-        if (!string.IsNullOrEmpty(moneda))
-            query["moneda"] = Uri.EscapeDataString(moneda);
+        if (precio_max.HasValue)
+            query["precio_max"] = precio_max.ToString();
 
         uriBuilder.Query = query.ToString();
 
         var url = uriBuilder.ToString();
 
         var vuelos = await CachedHttpClient.GetFromJsonAsync<ConsultaVuelosResponse>(url);
-        return vuelos?.flights ?? throw new InvalidOperationException();
+        return vuelos?.data ?? throw new InvalidOperationException();
     }
 }

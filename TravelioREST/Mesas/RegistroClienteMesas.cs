@@ -5,14 +5,61 @@ using System.Text;
 
 namespace TravelioREST.Mesas;
 
+//public class RegistroClienteRequest
+//{
+//    public string nombre { get; set; }
+//    public string apellido { get; set; }
+//    public string email { get; set; }
+//    public string tipo_identificacion { get; set; } = "Cedula";
+//    public string identificacion { get; set; }
+//}
+
 public class RegistroClienteRequest
 {
     public string nombre { get; set; }
     public string apellido { get; set; }
     public string email { get; set; }
-    public string tipo_identificacion { get; set; } = "Cedula";
+    public string tipoidentificacion { get; set; } = "Cedula";
     public string identificacion { get; set; }
 }
+
+//public class ClienteCreadoResponse
+//{
+//    public int id { get; set; }
+//    public string mensaje { get; set; }
+//    public string nombre { get; set; }
+//    public string apellido { get; set; }
+//    public string email { get; set; }
+//    public string tipo_identificacion { get; set; }
+//    public string identificacion { get; set; }
+//    public _LinksClienteCreado _links { get; set; }
+//}
+
+//public class _LinksClienteCreado
+//{
+//    public SelfClienteCreado self { get; set; }
+//    public ListarClienteCreado listar { get; set; }
+//    public ObtenerClienteCreado obtener { get; set; }
+//}
+
+//public class SelfClienteCreado
+//{
+//    public string href { get; set; }
+//    public string method { get; set; }
+//}
+
+//public class ListarClienteCreado
+//{
+//    public string href { get; set; }
+//    public string method { get; set; }
+//}
+
+//public class ObtenerClienteCreado
+//{
+//    public string href { get; set; }
+//    public string method { get; set; }
+//}
+
 
 public class ClienteCreadoResponse
 {
@@ -21,7 +68,7 @@ public class ClienteCreadoResponse
     public string nombre { get; set; }
     public string apellido { get; set; }
     public string email { get; set; }
-    public string tipo_identificacion { get; set; }
+    public string tipoidentificacion { get; set; }
     public string identificacion { get; set; }
     public _LinksClienteCreado _links { get; set; }
 }
@@ -30,7 +77,6 @@ public class _LinksClienteCreado
 {
     public SelfClienteCreado self { get; set; }
     public ListarClienteCreado listar { get; set; }
-    public ObtenerClienteCreado obtener { get; set; }
 }
 
 public class SelfClienteCreado
@@ -45,15 +91,10 @@ public class ListarClienteCreado
     public string method { get; set; }
 }
 
-public class ObtenerClienteCreado
-{
-    public string href { get; set; }
-    public string method { get; set; }
-}
 
 public static class RegistroClienteMesas
 {
-    public static async Task<ClienteCreadoResponse> CrearClienteAsync(string uri, 
+    public static async Task<ClienteCreadoResponse> CrearClienteAsync(string uri,
         string nombre,
         string apellido,
         string correo,
@@ -65,7 +106,7 @@ public static class RegistroClienteMesas
             nombre = nombre,
             apellido = apellido,
             email = correo,
-            tipo_identificacion = tipoIdentificacion,
+            tipoidentificacion = tipoIdentificacion,
             identificacion = identificacion
         };
 

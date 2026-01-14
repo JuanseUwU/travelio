@@ -5,54 +5,81 @@ using System.Text;
 
 namespace TravelioREST.Mesas;
 
+//public class MesaFacturaRequest
+//{
+//    public string id_reserva { get; set; }
+//    public string correo { get; set; }
+//    public string nombre { get; set; }
+//    public string tipo_identificacion { get; set; } = "Cedula";
+//    public string identificacion { get; set; }
+//    public decimal valor { get; set; }
+//}
+
 public class MesaFacturaRequest
 {
-    public string id_reserva { get; set; }
+    public string idReserva { get; set; }
     public string correo { get; set; }
     public string nombre { get; set; }
-    public string tipo_identificacion { get; set; } = "Cedula";
+    public string tipoIdentificacion { get; set; } = "Cedula";
     public string identificacion { get; set; }
     public decimal valor { get; set; }
 }
 
+//public class FacturaMesaResponse
+//{
+//    public string mensaje { get; set; }
+//    public string id_factura { get; set; }
+//    public string id_reserva { get; set; }
+//    public decimal subtotal { get; set; }
+//    public decimal iva { get; set; }
+//    public decimal total { get; set; }
+//    public string estado_factura { get; set; }
+//    public string estado_reserva { get; set; }
+//    public DateTime fecha_generacion { get; set; }
+//    public string uri_factura { get; set; }
+//    public _LinksFacturaMesa _links { get; set; }
+//}
+
+//public class _LinksFacturaMesa
+//{
+//    public SelfFacturaMesa self { get; set; }
+//    public VerfacturaFacturaMesa verFactura { get; set; }
+//    public PdfFacturaMesa pdf { get; set; }
+//}
+
+//public class SelfFacturaMesa
+//{
+//    public string href { get; set; }
+//    public string method { get; set; }
+//}
+
+//public class VerfacturaFacturaMesa
+//{
+//    public string href { get; set; }
+//    public string method { get; set; }
+//}
+
+//public class PdfFacturaMesa
+//{
+//    public string href { get; set; }
+//    public string method { get; set; }
+//}
+
 public class FacturaMesaResponse
 {
-    public string mensaje { get; set; }
-    public string id_factura { get; set; }
-    public string id_reserva { get; set; }
+    public int idFactura { get; set; }
+    public string idReserva { get; set; }
+    public string correo { get; set; }
+    public string nombre { get; set; }
+    public string tipoIdentificacion { get; set; }
+    public string identificacion { get; set; }
     public decimal subtotal { get; set; }
     public decimal iva { get; set; }
     public decimal total { get; set; }
-    public string estado_factura { get; set; }
-    public string estado_reserva { get; set; }
-    public DateTime fecha_generacion { get; set; }
-    public string uri_factura { get; set; }
-    public _LinksFacturaMesa _links { get; set; }
-}
-
-public class _LinksFacturaMesa
-{
-    public SelfFacturaMesa self { get; set; }
-    public VerfacturaFacturaMesa verFactura { get; set; }
-    public PdfFacturaMesa pdf { get; set; }
-}
-
-public class SelfFacturaMesa
-{
-    public string href { get; set; }
-    public string method { get; set; }
-}
-
-public class VerfacturaFacturaMesa
-{
-    public string href { get; set; }
-    public string method { get; set; }
-}
-
-public class PdfFacturaMesa
-{
-    public string href { get; set; }
-    public string method { get; set; }
+    public string estadoFactura { get; set; }
+    public string estadoReserva { get; set; }
+    public DateTime fechaGeneracion { get; set; }
+    public string uriFactura { get; set; }
 }
 
 public static class MesaFactura
@@ -67,10 +94,10 @@ public static class MesaFactura
     {
         var request = new MesaFacturaRequest
         {
-            id_reserva = id_reserva,
+            idReserva = id_reserva,
             correo = correo,
             nombre = nombre,
-            tipo_identificacion = tipo_identificacion,
+            tipoIdentificacion = tipo_identificacion,
             identificacion = identificacion,
             valor = valor
         };

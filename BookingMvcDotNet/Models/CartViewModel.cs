@@ -9,6 +9,7 @@ namespace BookingMvcDotNet.Models
         public string Titulo { get; set; } = string.Empty;
         public string Detalle { get; set; } = string.Empty;
         public int Cantidad { get; set; } = 1;
+        public int? CarritoItemId { get; set; }
 
         // --- PRECIOS ---
         public decimal PrecioOriginal { get; set; }   // Precio base (ej. 450)

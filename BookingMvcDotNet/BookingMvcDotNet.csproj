@@ -10,6 +10,7 @@
     <ProjectReference Include="..\TravelioAPIConnector\TravelioAPIConnector.csproj" />
     <ProjectReference Include="..\TravelioBankConnector\TravelioBankConnector.csproj" />
     <ProjectReference Include="..\TravelioDatabaseConnector\TravelioDatabaseConnector.csproj" />
+    <ProjectReference Include="..\TravelioIntegrator\TravelioIntegrator.csproj" />
   </ItemGroup>
 
   <ItemGroup>

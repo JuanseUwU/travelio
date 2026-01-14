@@ -1,17 +1,22 @@
 using BookingMvcDotNet.Models;
 using BookingMvcDotNet.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using TravelioIntegrator.Models.Carrito;
+using TravelioIntegrator.Services;
 
 namespace BookingMvcDotNet.Controllers;
 
 public class RestaurantesController : Controller
 {
     private readonly IRestaurantesService _restaurantesService;
+    private readonly TravelioIntegrationService _integrationService;
     private const string CART_SESSION_KEY = "MyCartSession";
 
-    public RestaurantesController(IRestaurantesService restaurantesService)
+    public RestaurantesController(IRestaurantesService restaurantesService, TravelioIntegrationService integrationService)
     {
         _restaurantesService = restaurantesService;
+        _integrationService = integrationService;
     }
 
     [HttpGet]
@@ -73,10 +78,26 @@ public class RestaurantesController : Controller
 
         if (existente != null)
         {
-            return Json(new { success = false, message = "Esta mesa ya está en tu carrito" });
+            return Json(new { success = false, message = "Esta mesa ya esta en tu carrito" });
         }
 
-        cart.Add(new CartItemViewModel
+        var clienteId = HttpContext.Session.GetInt32("ClienteId");
+        var clienteIdValue = clienteId.GetValueOrDefault();
+        var guardarEnDb = clienteIdValue > 0;
+        if (guardarEnDb)
+        {
+            var existentesDb = await _integrationService.ObtenerCarritoMesasAsync(clienteIdValue);
+            if (existentesDb?.Any(x =>
+                    x.ServicioId == servicioId &&
+                    x.IdMesa == idMesa &&
+                    x.FechaReserva.Date == fecha.Date &&
+                    x.NumeroPersonas == personas) == true)
+            {
+                return Json(new { success = false, message = "Esta mesa ya esta en tu carrito" });
+            }
+        }
+
+        var nuevo = new CartItemViewModel
         {
             Tipo = "RESTAURANT",
             IdProducto = idMesa.ToString(),
@@ -92,7 +113,34 @@ public class RestaurantesController : Controller
             FechaFin = fecha,
             NumeroPersonas = personas,
             UnidadPrecio = "por reserva"
-        });
+        };
+
+        if (guardarEnDb)
+        {
+            var request = new MesaCarritoRequest(
+                clienteIdValue,
+                servicioId,
+                idMesa,
+                mesa.IdRestaurante,
+                mesa.NumeroMesa,
+                mesa.TipoMesa,
+                mesa.Capacidad,
+                mesa.Precio,
+                string.IsNullOrWhiteSpace(mesa.ImagenUrl) ? null : mesa.ImagenUrl,
+                mesa.Estado,
+                fecha,
+                personas);
+
+            var dbItem = await _integrationService.AgregarMesaACarritoAsync(request);
+            if (dbItem == null)
+            {
+                return Json(new { success = false, message = "No se pudo guardar la mesa en tu carrito" });
+            }
+
+            nuevo.CarritoItemId = dbItem.Id;
+        }
+
+        cart.Add(nuevo);
 
         HttpContext.Session.Set(CART_SESSION_KEY, cart);
 

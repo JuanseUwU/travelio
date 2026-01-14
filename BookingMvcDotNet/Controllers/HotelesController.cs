@@ -1,6 +1,9 @@
 using BookingMvcDotNet.Models;
 using BookingMvcDotNet.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using TravelioIntegrator.Models.Carrito;
+using TravelioIntegrator.Services;
 
 namespace BookingMvcDotNet.Controllers;
 
@@ -10,11 +13,13 @@ namespace BookingMvcDotNet.Controllers;
 public class HotelesController : Controller
 {
     private readonly IHotelesService _hotelesService;
+    private readonly TravelioIntegrationService _integrationService;
     private const string CART_SESSION_KEY = "MyCartSession";
 
-    public HotelesController(IHotelesService hotelesService)
+    public HotelesController(IHotelesService hotelesService, TravelioIntegrationService integrationService)
     {
         _hotelesService = hotelesService;
+        _integrationService = integrationService;
     }
 
     /// <summary>
@@ -101,7 +106,7 @@ public class HotelesController : Controller
         var cart = HttpContext.Session.Get<List<CartItemViewModel>>(CART_SESSION_KEY) 
             ?? new List<CartItemViewModel>();
 
-        // Verificar si ya existe esta habitación en el carrito
+        // Verificar si ya existe esta habitacion en el carrito
         var existente = cart.FirstOrDefault(x => 
             x.Tipo == "HOTEL" && 
             x.IdProducto == idHabitacion && 
@@ -109,17 +114,33 @@ public class HotelesController : Controller
 
         if (existente != null)
         {
-            return Json(new { success = false, message = "Esta habitación ya está en tu carrito" });
+            return Json(new { success = false, message = "Esta habitacion ya esta en tu carrito" });
         }
 
-        // Agregar al carrito
-        cart.Add(new CartItemViewModel
+        var clienteId = HttpContext.Session.GetInt32("ClienteId");
+        var clienteIdValue = clienteId.GetValueOrDefault();
+        var guardarEnDb = clienteIdValue > 0;
+        if (guardarEnDb)
+        {
+            var existentesDb = await _integrationService.ObtenerCarritoHabitacionesAsync(clienteIdValue);
+            if (existentesDb?.Any(x =>
+                    x.ServicioId == servicioId &&
+                    x.IdHabitacionProveedor == idHabitacion &&
+                    x.FechaInicio.Date == fechaInicio.Date &&
+                    x.FechaFin.Date == fechaFin.Date &&
+                    x.NumeroHuespedes == numeroHuespedes) == true)
+            {
+                return Json(new { success = false, message = "Esta habitacion ya esta en tu carrito" });
+            }
+        }
+
+        var nuevo = new CartItemViewModel
         {
             Tipo = "HOTEL",
             IdProducto = idHabitacion,
             ServicioId = servicioId,
             Titulo = $"{habitacion.Hotel} - {habitacion.NombreHabitacion}",
-            Detalle = $"{habitacion.Ciudad}, {habitacion.Pais} | {habitacion.TipoHabitacion} | {numeroHuespedes} huéspedes",
+            Detalle = $"{habitacion.Ciudad}, {habitacion.Pais} | {habitacion.TipoHabitacion} | {numeroHuespedes} huespedes",
             ImagenUrl = habitacion.ImagenPrincipal,
             PrecioOriginal = habitacion.PrecioNormal * noches,
             PrecioFinal = precioTotal,
@@ -129,7 +150,41 @@ public class HotelesController : Controller
             FechaFin = fechaFin,
             NumeroPersonas = numeroHuespedes,
             UnidadPrecio = $"({noches} noches)"
-        });
+        };
+
+        if (guardarEnDb)
+        {
+            var imagenes = habitacion.Imagenes.Length > 0 ? string.Join('|', habitacion.Imagenes) : null;
+            var request = new HabitacionCarritoRequest(
+                clienteIdValue,
+                servicioId,
+                idHabitacion,
+                habitacion.NombreHabitacion,
+                habitacion.TipoHabitacion,
+                habitacion.Hotel,
+                habitacion.Ciudad,
+                habitacion.Pais,
+                habitacion.Capacidad,
+                habitacion.PrecioNormal,
+                habitacion.PrecioActual,
+                habitacion.PrecioActual,
+                habitacion.Amenidades,
+                imagenes,
+                fechaInicio,
+                fechaFin,
+                numeroHuespedes);
+
+            var dbItem = await _integrationService.AgregarHabitacionACarritoAsync(request);
+            if (dbItem == null)
+            {
+                return Json(new { success = false, message = "No se pudo guardar la habitacion en tu carrito" });
+            }
+
+            nuevo.CarritoItemId = dbItem.Id;
+        }
+
+        // Agregar al carrito
+        cart.Add(nuevo);
 
         HttpContext.Session.Set(CART_SESSION_KEY, cart);
 

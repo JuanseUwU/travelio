@@ -14,7 +14,7 @@ public class UserRequest
 
 public class UserResponse
 {
-    public string idUsuario { get; set; }
+    public int idUsuario { get; set; }
     public string correo { get; set; }
     public bool exitoso { get; set; }
     public string mensaje { get; set; }

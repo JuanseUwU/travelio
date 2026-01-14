@@ -32,13 +32,16 @@ namespace TravelioIntegrator.Services;
 public class TravelioIntegrationService
 {
     private readonly TravelioDbContext _db;
+    private readonly ILogger _defaultLogger;
+    private const decimal COMISION_TRAVELIO = 0.10m;
 
-    public TravelioIntegrationService(TravelioDbContext db)
+    public TravelioIntegrationService(TravelioDbContext db, ILogger<TravelioIntegrationService>? logger = null)
     {
         _db = db;
+        _defaultLogger = logger ?? NullLogger<TravelioIntegrationService>.Instance;
     }
 
-    private static ILogger ResolveLogger(ILogger? logger) => logger ?? NullLogger.Instance;
+    private ILogger ResolveLogger(ILogger? logger) => logger ?? _defaultLogger;
 
     private static string? BuildUri(DetalleServicio detalle, string? endpoint)
     {
@@ -142,6 +145,40 @@ public class TravelioIntegrationService
     public Cliente? IniciarSesion(string correo, string passwordPlano, ILogger? logger = null) =>
         IniciarSesionAsync(correo, passwordPlano, logger).GetAwaiter().GetResult();
 
+    public async Task<Cliente?> ObtenerClientePorIdAsync(int clienteId, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            return await _db.Clientes.FindAsync(clienteId);
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener cliente {ClienteId}", clienteId);
+            return null;
+        }
+    }
+
+    public Cliente? ObtenerClientePorId(int clienteId, ILogger? logger = null) =>
+        ObtenerClientePorIdAsync(clienteId, logger).GetAwaiter().GetResult();
+
+    public async Task<Cliente?> ObtenerClientePorEmailAsync(string correo, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            return await _db.Clientes.FirstOrDefaultAsync(c => c.CorreoElectronico == correo);
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener cliente por correo {Correo}", correo);
+            return null;
+        }
+    }
+
+    public Cliente? ObtenerClientePorEmail(string correo, ILogger? logger = null) =>
+        ObtenerClientePorEmailAsync(correo, logger).GetAwaiter().GetResult();
+
     public async Task<bool?> EsAdministradorAsync(int clienteId, ILogger? logger = null)
     {
         var log = ResolveLogger(logger);
@@ -182,42 +219,55 @@ public class TravelioIntegrationService
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
                 var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
-                log.LogDebug("Buscando vuelos en {Uri} con filtros {@Filtros}", uri, filtros);
                 try
                 {
-                    var vuelos = await AerolineaConnector.GetVuelosAsync(
-                        uri!,
-                        filtros.Origen,
-                        filtros.Destino,
-                        filtros.FechaDespegue,
-                        filtros.FechaLlegada,
-                        filtros.TipoCabina,
-                        filtros.Pasajeros,
-                        filtros.PrecioMin,
-                        filtros.PrecioMax,
-                        forceSoap);
+                    log.LogDebug("Buscando vuelos en {Uri} con filtros {@Filtros}", uri, filtros);
+                    try
+                    {
+                        var vuelos = await AerolineaConnector.GetVuelosAsync(
+                            uri!,
+                            filtros.Origen,
+                            filtros.Destino,
+                            filtros.FechaDespegue,
+                            filtros.FechaLlegada,
+                            filtros.TipoCabina,
+                            filtros.Pasajeros,
+                            filtros.PrecioMin,
+                            filtros.PrecioMax,
+                            forceSoap);
 
-                    resultados.AddRange(vuelos.Select(v => new ProductoServicio<Vuelo>(det.ServicioId, det.Servicio.Nombre, v)));
+                        resultados.AddRange(vuelos.Select(v => new ProductoServicio<Vuelo>(det.ServicioId, det.Servicio.Nombre, v)
+                        {
+                            UriBase = det.UriBase
+                        }));
+                    }
+                    catch (NotImplementedException) when (preferRest)
+                    {
+                        var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                        if (detSoap is null) throw;
+
+                        var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                        var vuelos = await AerolineaConnector.GetVuelosAsync(
+                            uriSoap!,
+                            filtros.Origen,
+                            filtros.Destino,
+                            filtros.FechaDespegue,
+                            filtros.FechaLlegada,
+                            filtros.TipoCabina,
+                            filtros.Pasajeros,
+                            filtros.PrecioMin,
+                            filtros.PrecioMax,
+                            true);
+
+                        resultados.AddRange(vuelos.Select(v => new ProductoServicio<Vuelo>(detSoap.ServicioId, detSoap.Servicio.Nombre, v)
+                        {
+                            UriBase = detSoap.UriBase
+                        }));
+                    }
                 }
-                catch (NotImplementedException) when (preferRest)
+                catch (Exception ex)
                 {
-                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
-                    if (detSoap is null) throw;
-
-                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
-                    var vuelos = await AerolineaConnector.GetVuelosAsync(
-                        uriSoap!,
-                        filtros.Origen,
-                        filtros.Destino,
-                        filtros.FechaDespegue,
-                        filtros.FechaLlegada,
-                        filtros.TipoCabina,
-                        filtros.Pasajeros,
-                        filtros.PrecioMin,
-                        filtros.PrecioMax,
-                        true);
-
-                    resultados.AddRange(vuelos.Select(v => new ProductoServicio<Vuelo>(detSoap.ServicioId, detSoap.Servicio.Nombre, v)));
+                    log.LogError(ex, "Error al buscar vuelos en {Uri}", uri);
                 }
             }
 
@@ -262,7 +312,10 @@ public class TravelioIntegrationService
                     filtros.PrecioMax,
                     forceSoap);
 
-                return vuelos.Select(v => new ProductoServicio<Vuelo>(det.ServicioId, det.Servicio.Nombre, v)).ToArray();
+                return vuelos.Select(v => new ProductoServicio<Vuelo>(det.ServicioId, det.Servicio.Nombre, v)
+                {
+                    UriBase = det.UriBase
+                }).ToArray();
             }
             catch (NotImplementedException) when (IsREST && alternativo is not null)
             {
@@ -279,7 +332,10 @@ public class TravelioIntegrationService
                     filtros.PrecioMax,
                     true);
 
-                return vuelos.Select(v => new ProductoServicio<Vuelo>(alternativo.ServicioId, alternativo.Servicio.Nombre, v)).ToArray();
+                return vuelos.Select(v => new ProductoServicio<Vuelo>(alternativo.ServicioId, alternativo.Servicio.Nombre, v)
+                {
+                    UriBase = alternativo.UriBase
+                }).ToArray();
             }
         }
         catch (Exception ex)
@@ -308,42 +364,55 @@ public class TravelioIntegrationService
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
                 var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
-                log.LogDebug("Buscando autos en {Uri} con filtros {@Filtros}", uri, filtros);
                 try
                 {
-                    var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
-                        uri!,
-                        filtros.Categoria,
-                        filtros.Transmision,
-                        filtros.Capacidad,
-                        filtros.PrecioMin,
-                        filtros.PrecioMax,
-                        filtros.Sort,
-                        filtros.Ciudad,
-                        filtros.Pais,
-                        forceSoap);
+                    log.LogDebug("Buscando autos en {Uri} con filtros {@Filtros}", uri, filtros);
+                    try
+                    {
+                        var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
+                            uri!,
+                            filtros.Categoria,
+                            filtros.Transmision,
+                            filtros.Capacidad,
+                            filtros.PrecioMin,
+                            filtros.PrecioMax,
+                            filtros.Sort,
+                            filtros.Ciudad,
+                            filtros.Pais,
+                            forceSoap);
 
-                    resultados.AddRange(autos.Select(a => new ProductoServicio<Vehiculo>(det.ServicioId, det.Servicio.Nombre, a)));
+                        resultados.AddRange(autos.Select(a => new ProductoServicio<Vehiculo>(det.ServicioId, det.Servicio.Nombre, a)
+                        {
+                            UriBase = det.UriBase
+                        }));
+                    }
+                    catch (NotImplementedException) when (preferRest)
+                    {
+                        var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                        if (detSoap is null) throw;
+
+                        var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                        var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
+                            uriSoap!,
+                            filtros.Categoria,
+                            filtros.Transmision,
+                            filtros.Capacidad,
+                            filtros.PrecioMin,
+                            filtros.PrecioMax,
+                            filtros.Sort,
+                            filtros.Ciudad,
+                            filtros.Pais,
+                            true);
+
+                        resultados.AddRange(autos.Select(a => new ProductoServicio<Vehiculo>(detSoap.ServicioId, detSoap.Servicio.Nombre, a)
+                        {
+                            UriBase = detSoap.UriBase
+                        }));
+                    }
                 }
-                catch (NotImplementedException) when (preferRest)
+                catch (Exception ex)
                 {
-                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
-                    if (detSoap is null) throw;
-
-                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
-                    var autos = await TravelioAPIConnector.Autos.Connector.GetVehiculosAsync(
-                        uriSoap!,
-                        filtros.Categoria,
-                        filtros.Transmision,
-                        filtros.Capacidad,
-                        filtros.PrecioMin,
-                        filtros.PrecioMax,
-                        filtros.Sort,
-                        filtros.Ciudad,
-                        filtros.Pais,
-                        true);
-
-                    resultados.AddRange(autos.Select(a => new ProductoServicio<Vehiculo>(detSoap.ServicioId, detSoap.Servicio.Nombre, a)));
+                    log.LogError(ex, "Error al buscar autos en {Uri}", uri);
                 }
             }
 
@@ -387,7 +456,10 @@ public class TravelioIntegrationService
                     filtros.Pais,
                     forceSoap);
 
-                return autos.Select(a => new ProductoServicio<Vehiculo>(det.ServicioId, det.Servicio.Nombre, a)).ToArray();
+                return autos.Select(a => new ProductoServicio<Vehiculo>(det.ServicioId, det.Servicio.Nombre, a)
+                {
+                    UriBase = det.UriBase
+                }).ToArray();
             }
             catch (NotImplementedException) when (IsREST && alternativo is not null)
             {
@@ -404,7 +476,10 @@ public class TravelioIntegrationService
                     filtros.Pais,
                     true);
 
-                return autos.Select(a => new ProductoServicio<Vehiculo>(alternativo.ServicioId, alternativo.Servicio.Nombre, a)).ToArray();
+                return autos.Select(a => new ProductoServicio<Vehiculo>(alternativo.ServicioId, alternativo.Servicio.Nombre, a)
+                {
+                    UriBase = alternativo.UriBase
+                }).ToArray();
             }
         }
         catch (Exception ex)
@@ -433,38 +508,51 @@ public class TravelioIntegrationService
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
                 var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
-                log.LogDebug("Buscando habitaciones en {Uri} con filtros {@Filtros}", uri, filtros);
                 try
                 {
-                    var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
-                        uri!,
-                        filtros.FechaInicio,
-                        filtros.FechaFin,
-                        filtros.TipoHabitacion,
-                        filtros.Capacidad,
-                        filtros.PrecioMin,
-                        filtros.PrecioMax,
-                        forceSoap);
+                    log.LogDebug("Buscando habitaciones en {Uri} con filtros {@Filtros}", uri, filtros);
+                    try
+                    {
+                        var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
+                            uri!,
+                            filtros.FechaInicio,
+                            filtros.FechaFin,
+                            filtros.TipoHabitacion,
+                            filtros.Capacidad,
+                            filtros.PrecioMin,
+                            filtros.PrecioMax,
+                            forceSoap);
 
-                    resultados.AddRange(habitaciones.Select(h => new ProductoServicio<Habitacion>(det.ServicioId, det.Servicio.Nombre, h)));
+                        resultados.AddRange(habitaciones.Select(h => new ProductoServicio<Habitacion>(det.ServicioId, det.Servicio.Nombre, h)
+                        {
+                            UriBase = det.UriBase
+                        }));
+                    }
+                    catch (NotImplementedException) when (preferRest)
+                    {
+                        var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                        if (detSoap is null) throw;
+
+                        var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                        var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
+                            uriSoap!,
+                            filtros.FechaInicio,
+                            filtros.FechaFin,
+                            filtros.TipoHabitacion,
+                            filtros.Capacidad,
+                            filtros.PrecioMin,
+                            filtros.PrecioMax,
+                            true);
+
+                        resultados.AddRange(habitaciones.Select(h => new ProductoServicio<Habitacion>(detSoap.ServicioId, detSoap.Servicio.Nombre, h)
+                        {
+                            UriBase = detSoap.UriBase
+                        }));
+                    }
                 }
-                catch (NotImplementedException) when (preferRest)
+                catch (Exception ex)
                 {
-                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
-                    if (detSoap is null) throw;
-
-                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
-                    var habitaciones = await TravelioAPIConnector.Habitaciones.Connector.BuscarHabitacionesAsync(
-                        uriSoap!,
-                        filtros.FechaInicio,
-                        filtros.FechaFin,
-                        filtros.TipoHabitacion,
-                        filtros.Capacidad,
-                        filtros.PrecioMin,
-                        filtros.PrecioMax,
-                        true);
-
-                    resultados.AddRange(habitaciones.Select(h => new ProductoServicio<Habitacion>(detSoap.ServicioId, detSoap.Servicio.Nombre, h)));
+                    log.LogError(ex, "Error al buscar habitaciones en {Uri}", uri);
                 }
             }
 
@@ -506,7 +594,10 @@ public class TravelioIntegrationService
                     filtros.PrecioMax,
                     forceSoap);
 
-                return habitaciones.Select(h => new ProductoServicio<Habitacion>(det.ServicioId, det.Servicio.Nombre, h)).ToArray();
+                return habitaciones.Select(h => new ProductoServicio<Habitacion>(det.ServicioId, det.Servicio.Nombre, h)
+                {
+                    UriBase = det.UriBase
+                }).ToArray();
             }
             catch (NotImplementedException) when (IsREST && alternativo is not null)
             {
@@ -521,7 +612,10 @@ public class TravelioIntegrationService
                     filtros.PrecioMax,
                     true);
 
-                return habitaciones.Select(h => new ProductoServicio<Habitacion>(alternativo.ServicioId, alternativo.Servicio.Nombre, h)).ToArray();
+                return habitaciones.Select(h => new ProductoServicio<Habitacion>(alternativo.ServicioId, alternativo.Servicio.Nombre, h)
+                {
+                    UriBase = alternativo.UriBase
+                }).ToArray();
             }
         }
         catch (Exception ex)
@@ -550,34 +644,47 @@ public class TravelioIntegrationService
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
                 var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
-                log.LogDebug("Buscando paquetes en {Uri} con filtros {@Filtros}", uri, filtros);
                 try
                 {
-                    var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
-                        uri!,
-                        filtros.Ciudad,
-                        filtros.FechaInicio,
-                        filtros.TipoActividad,
-                        filtros.PrecioMax,
-                        forceSoap);
+                    log.LogDebug("Buscando paquetes en {Uri} con filtros {@Filtros}", uri, filtros);
+                    try
+                    {
+                        var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
+                            uri!,
+                            filtros.Ciudad,
+                            filtros.FechaInicio,
+                            filtros.TipoActividad,
+                            filtros.PrecioMax,
+                            forceSoap);
 
-                    resultados.AddRange(paquetes.Select(p => new ProductoServicio<Paquete>(det.ServicioId, det.Servicio.Nombre, p)));
+                        resultados.AddRange(paquetes.Select(p => new ProductoServicio<Paquete>(det.ServicioId, det.Servicio.Nombre, p)
+                        {
+                            UriBase = det.UriBase
+                        }));
+                    }
+                    catch (NotImplementedException) when (preferRest)
+                    {
+                        var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                        if (detSoap is null) throw;
+
+                        var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                        var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
+                            uriSoap!,
+                            filtros.Ciudad,
+                            filtros.FechaInicio,
+                            filtros.TipoActividad,
+                            filtros.PrecioMax,
+                            true);
+
+                        resultados.AddRange(paquetes.Select(p => new ProductoServicio<Paquete>(detSoap.ServicioId, detSoap.Servicio.Nombre, p)
+                        {
+                            UriBase = detSoap.UriBase
+                        }));
+                    }
                 }
-                catch (NotImplementedException) when (preferRest)
+                catch (Exception ex)
                 {
-                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
-                    if (detSoap is null) throw;
-
-                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
-                    var paquetes = await TravelioAPIConnector.Paquetes.Connector.BuscarPaquetesAsync(
-                        uriSoap!,
-                        filtros.Ciudad,
-                        filtros.FechaInicio,
-                        filtros.TipoActividad,
-                        filtros.PrecioMax,
-                        true);
-
-                    resultados.AddRange(paquetes.Select(p => new ProductoServicio<Paquete>(detSoap.ServicioId, detSoap.Servicio.Nombre, p)));
+                    log.LogError(ex, "Error al buscar paquetes en {Uri}", uri);
                 }
             }
 
@@ -617,7 +724,10 @@ public class TravelioIntegrationService
                     filtros.PrecioMax,
                     forceSoap);
 
-                return paquetes.Select(p => new ProductoServicio<Paquete>(det.ServicioId, det.Servicio.Nombre, p)).ToArray();
+                return paquetes.Select(p => new ProductoServicio<Paquete>(det.ServicioId, det.Servicio.Nombre, p)
+                {
+                    UriBase = det.UriBase
+                }).ToArray();
             }
             catch (NotImplementedException) when (IsREST && alternativo is not null)
             {
@@ -630,7 +740,10 @@ public class TravelioIntegrationService
                     filtros.PrecioMax,
                     true);
 
-                return paquetes.Select(p => new ProductoServicio<Paquete>(alternativo.ServicioId, alternativo.Servicio.Nombre, p)).ToArray();
+                return paquetes.Select(p => new ProductoServicio<Paquete>(alternativo.ServicioId, alternativo.Servicio.Nombre, p)
+                {
+                    UriBase = alternativo.UriBase
+                }).ToArray();
             }
         }
         catch (Exception ex)
@@ -659,32 +772,45 @@ public class TravelioIntegrationService
             {
                 var uri = BuildUri(det, det.ObtenerProductosEndpoint);
                 var forceSoap = preferRest && det.TipoProtocolo == TipoProtocolo.Soap;
-                log.LogDebug("Buscando mesas en {Uri} con filtros {@Filtros}", uri, filtros);
                 try
                 {
-                    var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
-                        uri!,
-                        filtros.Capacidad,
-                        filtros.TipoMesa,
-                        filtros.Estado,
-                        forceSoap);
+                    log.LogDebug("Buscando mesas en {Uri} con filtros {@Filtros}", uri, filtros);
+                    try
+                    {
+                        var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
+                            uri!,
+                            filtros.Capacidad,
+                            filtros.TipoMesa,
+                            filtros.Estado,
+                            forceSoap);
 
-                    resultados.AddRange(mesas.Select(m => new ProductoServicio<Mesa>(det.ServicioId, det.Servicio.Nombre, m)));
+                        resultados.AddRange(mesas.Select(m => new ProductoServicio<Mesa>(det.ServicioId, det.Servicio.Nombre, m)
+                        {
+                            UriBase = det.UriBase
+                        }));
+                    }
+                    catch (NotImplementedException) when (preferRest)
+                    {
+                        var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
+                        if (detSoap is null) throw;
+
+                        var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
+                        var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
+                            uriSoap!,
+                            filtros.Capacidad,
+                            filtros.TipoMesa,
+                            filtros.Estado,
+                            true);
+
+                        resultados.AddRange(mesas.Select(m => new ProductoServicio<Mesa>(detSoap.ServicioId, detSoap.Servicio.Nombre, m)
+                        {
+                            UriBase = detSoap.UriBase
+                        }));
+                    }
                 }
-                catch (NotImplementedException) when (preferRest)
+                catch (Exception ex)
                 {
-                    var detSoap = detalles.FirstOrDefault(d => d.ServicioId == det.ServicioId && d.TipoProtocolo == TipoProtocolo.Soap);
-                    if (detSoap is null) throw;
-
-                    var uriSoap = BuildUri(detSoap, detSoap.ObtenerProductosEndpoint);
-                    var mesas = await TravelioAPIConnector.Mesas.Connector.BuscarMesasAsync(
-                        uriSoap!,
-                        filtros.Capacidad,
-                        filtros.TipoMesa,
-                        filtros.Estado,
-                        true);
-
-                    resultados.AddRange(mesas.Select(m => new ProductoServicio<Mesa>(detSoap.ServicioId, detSoap.Servicio.Nombre, m)));
+                    log.LogError(ex, "Error al buscar mesas en {Uri}", uri);
                 }
             }
 
@@ -723,7 +849,10 @@ public class TravelioIntegrationService
                     filtros.Estado,
                     forceSoap);
 
-                return mesas.Select(m => new ProductoServicio<Mesa>(det.ServicioId, det.Servicio.Nombre, m)).ToArray();
+                return mesas.Select(m => new ProductoServicio<Mesa>(det.ServicioId, det.Servicio.Nombre, m)
+                {
+                    UriBase = det.UriBase
+                }).ToArray();
             }
             catch (NotImplementedException) when (IsREST && alternativo is not null)
             {
@@ -735,7 +864,10 @@ public class TravelioIntegrationService
                     filtros.Estado,
                     true);
 
-                return mesas.Select(m => new ProductoServicio<Mesa>(alternativo.ServicioId, alternativo.Servicio.Nombre, m)).ToArray();
+                return mesas.Select(m => new ProductoServicio<Mesa>(alternativo.ServicioId, alternativo.Servicio.Nombre, m)
+                {
+                    UriBase = alternativo.UriBase
+                }).ToArray();
             }
         }
         catch (Exception ex)
@@ -747,6 +879,365 @@ public class TravelioIntegrationService
 
     public IReadOnlyList<ProductoServicio<Mesa>>? BuscarMesasPorServicio(int servicioId, FiltroMesas filtros, ILogger? logger = null) =>
         BuscarMesasPorServicioAsync(servicioId, filtros, logger).GetAwaiter().GetResult();
+
+    #endregion
+
+    #region Detalles y disponibilidad
+
+    public async Task<ProductoServicio<Vuelo>?> ObtenerVueloAsync(int servicioId, string idVuelo, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var vuelos = await BuscarVuelosPorServicioAsync(servicioId, default, logger);
+            if (vuelos is null) return null;
+
+            foreach (var item in vuelos)
+            {
+                if (item.Producto.IdVuelo == idVuelo)
+                {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener vuelo {IdVuelo} del servicio {ServicioId}", idVuelo, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<ProductoServicio<Vehiculo>?> ObtenerAutoAsync(int servicioId, string idAuto, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var autos = await BuscarAutosPorServicioAsync(servicioId, default, logger);
+            if (autos is null) return null;
+
+            foreach (var item in autos)
+            {
+                if (item.Producto.IdAuto == idAuto)
+                {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener auto {IdAuto} del servicio {ServicioId}", idAuto, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<ProductoServicio<Habitacion>?> ObtenerHabitacionAsync(int servicioId, string idHabitacion, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var habitaciones = await BuscarHabitacionesPorServicioAsync(servicioId, default, logger);
+            if (habitaciones is null) return null;
+
+            foreach (var item in habitaciones)
+            {
+                if (item.Producto.IdHabitacion == idHabitacion)
+                {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener habitaci\u00f3n {IdHabitacion} del servicio {ServicioId}", idHabitacion, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<ProductoServicio<Paquete>?> ObtenerPaqueteAsync(int servicioId, string idPaquete, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var paquetes = await BuscarPaquetesPorServicioAsync(servicioId, default, logger);
+            if (paquetes is null) return null;
+
+            foreach (var item in paquetes)
+            {
+                if (item.Producto.IdPaquete == idPaquete)
+                {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener paquete {IdPaquete} del servicio {ServicioId}", idPaquete, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<ProductoServicio<Mesa>?> ObtenerMesaAsync(int servicioId, int idMesa, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var mesas = await BuscarMesasPorServicioAsync(servicioId, default, logger);
+            if (mesas is null) return null;
+
+            foreach (var item in mesas)
+            {
+                if (item.Producto.IdMesa == idMesa)
+                {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener mesa {IdMesa} del servicio {ServicioId}", idMesa, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<bool?> VerificarDisponibilidadVueloAsync(int servicioId, string idVuelo, int pasajeros, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var detalles = await _db.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
+
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
+            if (det is null) return null;
+
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+            var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+            try
+            {
+                return await AerolineaConnector.VerificarDisponibilidadVueloAsync(uri!, idVuelo, pasajeros, forceSoap);
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                return await AerolineaConnector.VerificarDisponibilidadVueloAsync(uriSoap!, idVuelo, pasajeros, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al verificar disponibilidad de vuelo {IdVuelo} en servicio {ServicioId}", idVuelo, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<bool?> VerificarDisponibilidadAutoAsync(int servicioId, string idAuto, DateTime fechaInicio, DateTime fechaFin, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var detalles = await _db.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
+
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
+            if (det is null) return null;
+
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+            var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+            try
+            {
+                return await AutosConnector.VerificarDisponibilidadAutoAsync(uri!, idAuto, fechaInicio, fechaFin, forceSoap);
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                return await AutosConnector.VerificarDisponibilidadAutoAsync(uriSoap!, idAuto, fechaInicio, fechaFin, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al verificar disponibilidad de auto {IdAuto} en servicio {ServicioId}", idAuto, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<bool?> VerificarDisponibilidadHabitacionAsync(int servicioId, string idHabitacion, DateTime fechaInicio, DateTime fechaFin, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var detalles = await _db.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
+
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
+            if (det is null) return null;
+
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+            var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+            try
+            {
+                return await HabitacionesConnector.ValidarDisponibilidadAsync(uri!, idHabitacion, fechaInicio, fechaFin, forceSoap);
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                return await HabitacionesConnector.ValidarDisponibilidadAsync(uriSoap!, idHabitacion, fechaInicio, fechaFin, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al verificar disponibilidad de habitaci\u00f3n {IdHabitacion} en servicio {ServicioId}", idHabitacion, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<bool?> VerificarDisponibilidadPaqueteAsync(int servicioId, string idPaquete, DateTime fechaInicio, int personas, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var detalles = await _db.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
+
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
+            if (det is null) return null;
+
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+            var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+            try
+            {
+                return await PaquetesConnector.ValidarDisponibilidadAsync(uri!, idPaquete, fechaInicio, personas, forceSoap);
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                return await PaquetesConnector.ValidarDisponibilidadAsync(uriSoap!, idPaquete, fechaInicio, personas, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al verificar disponibilidad de paquete {IdPaquete} en servicio {ServicioId}", idPaquete, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<bool?> VerificarDisponibilidadMesaAsync(int servicioId, int idMesa, DateTime fecha, int personas, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var detalles = await _db.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
+
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
+            if (det is null) return null;
+
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+            var uri = BuildUri(det, det.ConfirmarProductoEndpoint);
+            try
+            {
+                return await MesasConnector.ValidarDisponibilidadAsync(uri!, idMesa, fecha, personas, forceSoap);
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.ConfirmarProductoEndpoint);
+                return await MesasConnector.ValidarDisponibilidadAsync(uriSoap!, idMesa, fecha, personas, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al verificar disponibilidad de mesa {IdMesa} en servicio {ServicioId}", idMesa, servicioId);
+            return null;
+        }
+    }
+
+    public async Task<(bool exito, string mensaje)> CrearPrerreservaAutoAsync(int servicioId, string idAuto, DateTime fechaInicio, DateTime fechaFin, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var detalles = await _db.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
+
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
+            if (det is null) return (false, "Servicio no encontrado");
+
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+            try
+            {
+                var uri = BuildUri(det, det.CrearPrerreservaEndpoint);
+                var (holdId, _) = await AutosConnector.CrearPrerreservaAsync(uri!, idAuto, fechaInicio, fechaFin, 300, forceSoap);
+                return (true, $"Prerreserva creada: {holdId}");
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.CrearPrerreservaEndpoint);
+                var (holdId, _) = await AutosConnector.CrearPrerreservaAsync(uriSoap!, idAuto, fechaInicio, fechaFin, 300, true);
+                return (true, $"Prerreserva creada: {holdId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al crear prerreserva auto {IdAuto} en servicio {ServicioId}", idAuto, servicioId);
+            return (false, "Error al crear prerreserva");
+        }
+    }
+
+    public async Task<(bool exito, string mensaje, string? holdId)> CrearPrerreservaHabitacionAsync(
+        int servicioId,
+        string idHabitacion,
+        DateTime fechaInicio,
+        DateTime fechaFin,
+        int numeroHuespedes,
+        decimal precioActual,
+        ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var detalles = await _db.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
+
+            var (det, alternativo) = SeleccionarDetalle(detalles, IsREST);
+            if (det is null) return (false, "Servicio no encontrado", null);
+
+            var forceSoap = IsREST && det.TipoProtocolo == TipoProtocolo.Soap;
+            try
+            {
+                var uri = BuildUri(det, det.CrearPrerreservaEndpoint);
+                var holdId = await HabitacionesConnector.CrearPrerreservaAsync(
+                    uri!, idHabitacion, fechaInicio, fechaFin, numeroHuespedes, 300, precioActual, forceSoap);
+                return (true, $"Prerreserva creada: {holdId}", holdId);
+            }
+            catch (NotImplementedException) when (IsREST && alternativo is not null)
+            {
+                var uriSoap = BuildUri(alternativo, alternativo.CrearPrerreservaEndpoint);
+                var holdId = await HabitacionesConnector.CrearPrerreservaAsync(
+                    uriSoap!, idHabitacion, fechaInicio, fechaFin, numeroHuespedes, 300, precioActual, true);
+                return (true, $"Prerreserva creada: {holdId}", holdId);
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al crear prerreserva habitaci\u00f3n {IdHabitacion} en servicio {ServicioId}", idHabitacion, servicioId);
+            return (false, "Error al crear prerreserva", null);
+        }
+    }
 
     #endregion
 
@@ -1525,6 +2016,1199 @@ public class TravelioIntegrationService
 
     public bool? CrearHoldsParaUsuario(int clienteId, int duracionHoldSegundos = 300, ILogger? logger = null) =>
         CrearHoldsParaUsuarioAsync(clienteId, duracionHoldSegundos, logger).GetAwaiter().GetResult();
+
+    #endregion
+
+    public async Task<CheckoutResult> ProcesarCheckoutAsync(
+        int clienteId,
+        int cuentaBancariaCliente,
+        IReadOnlyList<CheckoutItem> items,
+        FacturaInfo facturaInfo,
+        ILogger? logger = null)
+    {
+        var resultado = new CheckoutResult();
+        var log = ResolveLogger(logger);
+
+        try
+        {
+            var cliente = await _db.Clientes.FindAsync(clienteId);
+            if (cliente is null)
+            {
+                resultado.Mensaje = "Cliente no encontrado.";
+                return resultado;
+            }
+
+            decimal totalCarrito = items.Sum(i => i.PrecioFinal * i.Cantidad);
+            decimal iva = totalCarrito * 0.12m;
+            decimal totalConIva = totalCarrito + iva;
+
+            log.LogInformation("Procesando checkout para cliente {ClienteId}. Total: ${Total}", clienteId, totalConIva);
+
+            var cobroExitoso = await TransferirClass.RealizarTransferenciaAsync(
+                cuentaDestino: TransferirClass.cuentaDefaultTravelio,
+                monto: totalConIva,
+                cuentaOrigen: cuentaBancariaCliente
+            );
+
+            if (!cobroExitoso)
+            {
+                log.LogWarning("Fallo el cobro al cliente {ClienteId}", clienteId);
+                resultado.Mensaje = "No se pudo procesar el pago. Verifica tu saldo o cuenta bancaria.";
+                return resultado;
+            }
+
+            log.LogInformation("Cobro exitoso de ${Monto} al cliente {ClienteId}", totalConIva, clienteId);
+
+            var compra = new Compra
+            {
+                ClienteId = clienteId,
+                FechaCompra = DateTime.UtcNow,
+                ValorPagado = totalConIva
+            };
+            _db.Compras.Add(compra);
+            await _db.SaveChangesAsync();
+
+            resultado.CompraId = compra.Id;
+            resultado.TotalPagado = totalConIva;
+
+            foreach (var item in items)
+            {
+                var reservaResult = new ReservaResult { Tipo = item.Tipo, Titulo = item.Titulo };
+
+                try
+                {
+                    switch (item.Tipo)
+                    {
+                        case "CAR":
+                            await ProcesarReservaAutoAsync(item, cliente, facturaInfo, compra, reservaResult, log);
+                            break;
+                        case "HOTEL":
+                            await ProcesarReservaHotelAsync(item, cliente, facturaInfo, compra, reservaResult, log);
+                            break;
+                        case "FLIGHT":
+                            await ProcesarReservaVueloAsync(item, cliente, facturaInfo, compra, reservaResult, log);
+                            break;
+                        case "RESTAURANT":
+                            await ProcesarReservaMesaAsync(item, cliente, facturaInfo, compra, reservaResult, log);
+                            break;
+                        case "PACKAGE":
+                            await ProcesarReservaPaqueteAsync(item, cliente, facturaInfo, compra, reservaResult, log);
+                            break;
+                        default:
+                            reservaResult.Error = $"Tipo de servicio desconocido: {item.Tipo}";
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.LogError(ex, "Error procesando reserva para {Titulo}", item.Titulo);
+                    reservaResult.Error = "Error al procesar la reserva";
+                }
+
+                resultado.Reservas.Add(reservaResult);
+            }
+
+            var todasExitosas = resultado.Reservas.All(r => r.Exitoso);
+            var algunaExitosa = resultado.Reservas.Any(r => r.Exitoso);
+
+            if (todasExitosas)
+            {
+                resultado.Exitoso = true;
+                resultado.Mensaje = "Compra realizada con exito! Tus reservas han sido confirmadas.";
+            }
+            else if (algunaExitosa)
+            {
+                resultado.Exitoso = true;
+                resultado.Mensaje = "Compra parcialmente exitosa. Algunas reservas no pudieron procesarse.";
+            }
+            else
+            {
+                resultado.Mensaje = "No se pudieron procesar las reservas. Se intentara reembolsar el pago.";
+                await TransferirClass.RealizarTransferenciaAsync(
+                    cuentaDestino: cuentaBancariaCliente,
+                    monto: totalConIva,
+                    cuentaOrigen: TransferirClass.cuentaDefaultTravelio
+                );
+            }
+
+            await _db.SaveChangesAsync();
+            return resultado;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error en checkout para cliente {ClienteId}", clienteId);
+            resultado.Mensaje = "Error inesperado al procesar la compra.";
+            return resultado;
+        }
+    }
+
+    #region Checkout helpers
+
+    private async Task<(DetalleServicio? rest, DetalleServicio? soap, Servicio? servicio)> ObtenerDetallesServicioAsync(int servicioId, ILogger log)
+    {
+        try
+        {
+            var detalles = await _db.DetallesServicio
+                .Include(d => d.Servicio)
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
+
+            var rest = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Rest);
+            var soap = detalles.FirstOrDefault(d => d.TipoProtocolo == TipoProtocolo.Soap);
+            var servicio = detalles.FirstOrDefault()?.Servicio;
+
+            return (rest, soap, servicio);
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener detalles del servicio {ServicioId}", servicioId);
+            return (null, null, null);
+        }
+    }
+
+    private static string ResolveNombreFactura(Cliente cliente, FacturaInfo facturaInfo)
+    {
+        if (!string.IsNullOrWhiteSpace(facturaInfo.NombreFactura))
+        {
+            return facturaInfo.NombreFactura;
+        }
+
+        return $"{cliente.Nombre} {cliente.Apellido}".Trim();
+    }
+
+    private static (string nombre, string apellido) ResolveNombreApellidoFactura(Cliente cliente, FacturaInfo facturaInfo)
+    {
+        if (!string.IsNullOrWhiteSpace(facturaInfo.NombreFactura))
+        {
+            var partes = facturaInfo.NombreFactura.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var nombre = partes.FirstOrDefault() ?? cliente.Nombre;
+            var apellido = partes.Skip(1).FirstOrDefault() ?? cliente.Apellido;
+            return (nombre, apellido);
+        }
+
+        return (cliente.Nombre, cliente.Apellido);
+    }
+
+    private async Task ProcesarReservaAutoAsync(
+        CheckoutItem item,
+        Cliente cliente,
+        FacturaInfo facturaInfo,
+        Compra compra,
+        ReservaResult reservaResult,
+        ILogger log)
+    {
+        var (detalleRest, detalleSoap, servicio) = await ObtenerDetallesServicioAsync(item.ServicioId, log);
+
+        if (servicio is null)
+        {
+            reservaResult.Error = "Servicio no encontrado";
+            return;
+        }
+
+        if (!item.FechaInicio.HasValue || !item.FechaFin.HasValue)
+        {
+            reservaResult.Error = "Fechas de reserva no validas";
+            return;
+        }
+
+        var fechaInicio = item.FechaInicio.Value;
+        var fechaFin = item.FechaFin.Value;
+        bool usandoRest = false;
+
+        log.LogInformation("Procesando reserva de auto {IdAuto} en {Servicio}", item.IdProducto, servicio.Nombre);
+
+        await CrearClienteExternoAutoAsync(detalleRest, detalleSoap, cliente, log);
+
+        string holdId = string.Empty;
+        Exception? ultimoError = null;
+
+        if (detalleRest is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleRest, detalleRest.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando prerreserva auto (REST): {Uri}", uri);
+                    (holdId, _) = await AutosConnector.CrearPrerreservaAsync(uri, item.IdProducto, fechaInicio, fechaFin);
+                    usandoRest = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "REST fallo para prerreserva auto");
+                ultimoError = ex;
+            }
+        }
+
+        if (!usandoRest && detalleSoap is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleSoap, detalleSoap.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando prerreserva auto (SOAP): {Uri}", uri);
+                    (holdId, _) = await AutosConnector.CrearPrerreservaAsync(uri, item.IdProducto, fechaInicio, fechaFin, forceSoap: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "SOAP tambien fallo para prerreserva auto");
+                ultimoError = ex;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(holdId))
+        {
+            reservaResult.Error = $"No se pudo crear prerreserva: {ultimoError?.Message ?? "Servicio no disponible"}";
+            return;
+        }
+
+        log.LogInformation("Prerreserva auto creada ({Protocolo}): {HoldId}", usandoRest ? "REST" : "SOAP", holdId);
+
+        var detalle = usandoRest ? detalleRest! : detalleSoap!;
+        var uriReserva = BuildUri(detalle, detalle.CrearReservaEndpoint);
+        if (string.IsNullOrWhiteSpace(uriReserva))
+        {
+            reservaResult.Error = "Endpoint de reserva no configurado";
+            return;
+        }
+
+        var reservaId = await AutosConnector.CrearReservaAsync(
+            uriReserva,
+            item.IdProducto,
+            holdId,
+            cliente.Nombre,
+            cliente.Apellido,
+            cliente.TipoIdentificacion,
+            cliente.DocumentoIdentidad,
+            cliente.CorreoElectronico,
+            fechaInicio,
+            fechaFin,
+            forceSoap: !usandoRest);
+
+        log.LogInformation("Reserva auto creada: {ReservaId}", reservaId);
+        reservaResult.CodigoReserva = reservaId.ToString();
+
+        try
+        {
+            var uriFactura = BuildUri(detalle, detalle.GenerarFacturaEndpoint);
+            if (!string.IsNullOrWhiteSpace(uriFactura))
+            {
+                decimal subtotal = item.PrecioFinal;
+                decimal iva = subtotal * 0.12m;
+                decimal total = subtotal + iva;
+
+                var nombreFactura = ResolveNombreFactura(cliente, facturaInfo);
+                var facturaUrl = await AutosConnector.GenerarFacturaAsync(
+                    uriFactura,
+                    reservaId,
+                    subtotal,
+                    iva,
+                    total,
+                    (nombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura),
+                    forceSoap: !usandoRest);
+
+                reservaResult.FacturaProveedorUrl = facturaUrl;
+            }
+            else
+            {
+                log.LogWarning("No se pudo generar factura auto: endpoint no configurado");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo generar factura auto");
+        }
+
+        await PagarProveedorAsync(servicio, item.PrecioFinal, log);
+        await RegistrarReservaEnDbAsync(item.ServicioId, reservaId.ToString(), reservaResult.FacturaProveedorUrl, compra, item.PrecioFinal);
+
+        reservaResult.Exitoso = true;
+    }
+
+    private async Task CrearClienteExternoAutoAsync(DetalleServicio? rest, DetalleServicio? soap, Cliente cliente, ILogger log)
+    {
+        try
+        {
+            if (rest is not null)
+            {
+                try
+                {
+                    var uri = BuildUri(rest, rest.RegistrarClienteEndpoint);
+                    if (!string.IsNullOrWhiteSpace(uri))
+                    {
+                        await AutosConnector.CrearClienteExternoAsync(uri, cliente.Nombre, cliente.Apellido, cliente.CorreoElectronico);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "REST fallo al crear cliente externo auto");
+                }
+            }
+
+            if (soap is not null)
+            {
+                var uri = BuildUri(soap, soap.RegistrarClienteEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    await AutosConnector.CrearClienteExternoAsync(uri, cliente.Nombre, cliente.Apellido, cliente.CorreoElectronico, forceSoap: true);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo crear cliente externo auto");
+        }
+    }
+
+    private async Task ProcesarReservaHotelAsync(
+        CheckoutItem item,
+        Cliente cliente,
+        FacturaInfo facturaInfo,
+        Compra compra,
+        ReservaResult reservaResult,
+        ILogger log)
+    {
+        var (detalleRest, detalleSoap, servicio) = await ObtenerDetallesServicioAsync(item.ServicioId, log);
+
+        if (servicio is null)
+        {
+            reservaResult.Error = "Servicio no encontrado";
+            return;
+        }
+
+        if (!item.FechaInicio.HasValue || !item.FechaFin.HasValue)
+        {
+            reservaResult.Error = "Fechas de reserva no validas";
+            return;
+        }
+
+        var fechaInicio = item.FechaInicio.Value;
+        var fechaFin = item.FechaFin.Value;
+        var numeroHuespedes = item.NumeroPersonas ?? 2;
+        bool usandoRest = false;
+
+        log.LogInformation("Procesando reserva hotel {IdHabitacion} en {Servicio}", item.IdProducto, servicio.Nombre);
+
+        await CrearClienteExternoHotelAsync(detalleRest, detalleSoap, cliente, log);
+
+        string holdId = string.Empty;
+        Exception? ultimoError = null;
+
+        if (detalleRest is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleRest, detalleRest.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando prerreserva hotel (REST): {Uri}", uri);
+                    holdId = await HabitacionesConnector.CrearPrerreservaAsync(uri, item.IdProducto, fechaInicio, fechaFin, numeroHuespedes, 300, item.PrecioUnitario);
+                    usandoRest = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "REST fallo para prerreserva hotel");
+                ultimoError = ex;
+            }
+        }
+
+        if (!usandoRest && detalleSoap is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleSoap, detalleSoap.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando prerreserva hotel (SOAP): {Uri}", uri);
+                    holdId = await HabitacionesConnector.CrearPrerreservaAsync(uri, item.IdProducto, fechaInicio, fechaFin, numeroHuespedes, 300, item.PrecioUnitario, forceSoap: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "SOAP tambien fallo para prerreserva hotel");
+                ultimoError = ex;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(holdId))
+        {
+            reservaResult.Error = $"No se pudo crear prerreserva: {ultimoError?.Message ?? "Servicio no disponible"}";
+            return;
+        }
+
+        log.LogInformation("Prerreserva hotel creada ({Protocolo}): {HoldId}", usandoRest ? "REST" : "SOAP", holdId);
+
+        var detalle = usandoRest ? detalleRest! : detalleSoap!;
+        var uriReserva = BuildUri(detalle, detalle.CrearReservaEndpoint);
+        if (string.IsNullOrWhiteSpace(uriReserva))
+        {
+            reservaResult.Error = "Endpoint de reserva no configurado";
+            return;
+        }
+
+        var reservaId = await HabitacionesConnector.CrearReservaAsync(
+            uriReserva,
+            item.IdProducto,
+            holdId,
+            cliente.Nombre,
+            cliente.Apellido,
+            cliente.CorreoElectronico,
+            cliente.TipoIdentificacion,
+            cliente.DocumentoIdentidad,
+            fechaInicio,
+            fechaFin,
+            numeroHuespedes,
+            forceSoap: !usandoRest);
+
+        log.LogInformation("Reserva hotel creada: {ReservaId}", reservaId);
+        reservaResult.CodigoReserva = reservaId.ToString();
+
+        try
+        {
+            var uriFactura = BuildUri(detalle, detalle.GenerarFacturaEndpoint);
+            if (!string.IsNullOrWhiteSpace(uriFactura))
+            {
+                var (nombreFactura, apellidoFactura) = ResolveNombreApellidoFactura(cliente, facturaInfo);
+                var facturaUrl = await HabitacionesConnector.EmitirFacturaAsync(
+                    uriFactura,
+                    reservaId,
+                    nombreFactura,
+                    apellidoFactura,
+                    facturaInfo.TipoDocumento,
+                    facturaInfo.Documento,
+                    facturaInfo.CorreoFactura,
+                    forceSoap: !usandoRest);
+
+                reservaResult.FacturaProveedorUrl = facturaUrl;
+            }
+            else
+            {
+                log.LogWarning("No se pudo generar factura hotel: endpoint no configurado");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo generar factura hotel");
+        }
+
+        await PagarProveedorAsync(servicio, item.PrecioFinal, log);
+        await RegistrarReservaEnDbAsync(item.ServicioId, reservaId.ToString(), reservaResult.FacturaProveedorUrl, compra, item.PrecioFinal);
+
+        reservaResult.Exitoso = true;
+    }
+
+    private async Task CrearClienteExternoHotelAsync(DetalleServicio? rest, DetalleServicio? soap, Cliente cliente, ILogger log)
+    {
+        try
+        {
+            if (rest is not null)
+            {
+                try
+                {
+                    var uri = BuildUri(rest, rest.RegistrarClienteEndpoint);
+                    if (!string.IsNullOrWhiteSpace(uri))
+                    {
+                        await HabitacionesConnector.CrearUsuarioExternoAsync(uri, cliente.CorreoElectronico, cliente.Nombre, cliente.Apellido);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "REST fallo al crear cliente externo hotel");
+                }
+            }
+
+            if (soap is not null)
+            {
+                var uri = BuildUri(soap, soap.RegistrarClienteEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    await HabitacionesConnector.CrearUsuarioExternoAsync(uri, cliente.CorreoElectronico, cliente.Nombre, cliente.Apellido, forceSoap: true);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo crear cliente externo hotel");
+        }
+    }
+
+    private async Task ProcesarReservaVueloAsync(
+        CheckoutItem item,
+        Cliente cliente,
+        FacturaInfo facturaInfo,
+        Compra compra,
+        ReservaResult reservaResult,
+        ILogger log)
+    {
+        var (detalleRest, detalleSoap, servicio) = await ObtenerDetallesServicioAsync(item.ServicioId, log);
+
+        if (servicio is null)
+        {
+            reservaResult.Error = "Servicio no encontrado";
+            return;
+        }
+
+        bool usandoRest = false;
+
+        log.LogInformation("Procesando reserva vuelo {IdVuelo} en {Servicio}", item.IdProducto, servicio.Nombre);
+
+        var pasajeros = new (string, string, string, string, DateTime)[]
+        {
+            (cliente.Nombre, cliente.Apellido, cliente.TipoIdentificacion, cliente.DocumentoIdentidad, DateTime.Now.AddYears(-30))
+        };
+
+        await CrearClienteExternoVueloAsync(detalleRest, detalleSoap, cliente, log);
+
+        string holdId = string.Empty;
+        Exception? ultimoError = null;
+
+        if (detalleRest is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleRest, detalleRest.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando prerreserva vuelo (REST): {Uri}", uri);
+                    (holdId, _) = await AerolineaConnector.CrearPrerreservaVueloAsync(uri, item.IdProducto, pasajeros, 300);
+                    usandoRest = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "REST fallo para prerreserva vuelo");
+                ultimoError = ex;
+            }
+        }
+
+        if (!usandoRest && detalleSoap is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleSoap, detalleSoap.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando prerreserva vuelo (SOAP): {Uri}", uri);
+                    (holdId, _) = await AerolineaConnector.CrearPrerreservaVueloAsync(uri, item.IdProducto, pasajeros, 300, forceSoap: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "SOAP tambien fallo para prerreserva vuelo");
+                ultimoError = ex;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(holdId))
+        {
+            reservaResult.Error = $"No se pudo crear prerreserva: {ultimoError?.Message ?? "Servicio no disponible"}";
+            return;
+        }
+
+        log.LogInformation("Prerreserva vuelo creada ({Protocolo}): {HoldId}", usandoRest ? "REST" : "SOAP", holdId);
+
+        var detalle = usandoRest ? detalleRest! : detalleSoap!;
+        var uriReserva = BuildUri(detalle, detalle.CrearReservaEndpoint);
+        if (string.IsNullOrWhiteSpace(uriReserva))
+        {
+            reservaResult.Error = "Endpoint de reserva no configurado";
+            return;
+        }
+
+        var (idReserva, codigoReserva, _) = await AerolineaConnector.CrearReservaAsync(
+            uriReserva,
+            item.IdProducto,
+            holdId,
+            cliente.CorreoElectronico,
+            pasajeros,
+            forceSoap: !usandoRest);
+
+        log.LogInformation("Reserva vuelo creada: {IdReserva}", idReserva);
+        reservaResult.CodigoReserva = codigoReserva;
+
+        try
+        {
+            var uriFactura = BuildUri(detalle, detalle.GenerarFacturaEndpoint);
+            if (!string.IsNullOrWhiteSpace(uriFactura))
+            {
+                decimal subtotal = item.PrecioFinal;
+                decimal iva = subtotal * 0.12m;
+                decimal total = subtotal + iva;
+
+                var nombreFactura = ResolveNombreFactura(cliente, facturaInfo);
+                var facturaUrl = await AerolineaConnector.GenerarFacturaAsync(
+                    uriFactura,
+                    idReserva,
+                    subtotal,
+                    iva,
+                    total,
+                    (nombreFactura, facturaInfo.TipoDocumento, facturaInfo.Documento, facturaInfo.CorreoFactura),
+                    forceSoap: !usandoRest);
+
+                reservaResult.FacturaProveedorUrl = facturaUrl;
+            }
+            else
+            {
+                log.LogWarning("No se pudo generar factura vuelo: endpoint no configurado");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo generar factura vuelo");
+        }
+
+        await PagarProveedorAsync(servicio, item.PrecioFinal, log);
+        await RegistrarReservaEnDbAsync(item.ServicioId, reservaResult.CodigoReserva, reservaResult.FacturaProveedorUrl, compra, item.PrecioFinal);
+
+        reservaResult.Exitoso = true;
+    }
+
+    private async Task CrearClienteExternoVueloAsync(DetalleServicio? rest, DetalleServicio? soap, Cliente cliente, ILogger log)
+    {
+        try
+        {
+            if (rest is not null)
+            {
+                try
+                {
+                    var uri = BuildUri(rest, rest.RegistrarClienteEndpoint);
+                    if (!string.IsNullOrWhiteSpace(uri))
+                    {
+                        await AerolineaConnector.CrearClienteExternoAsync(
+                            uri,
+                            cliente.CorreoElectronico,
+                            cliente.Nombre,
+                            cliente.Apellido,
+                            DateTime.Now.AddYears(-30),
+                            cliente.TipoIdentificacion,
+                            cliente.DocumentoIdentidad);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "REST fallo al crear cliente externo vuelo");
+                }
+            }
+
+            if (soap is not null)
+            {
+                var uri = BuildUri(soap, soap.RegistrarClienteEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    await AerolineaConnector.CrearClienteExternoAsync(
+                        uri,
+                        cliente.CorreoElectronico,
+                        cliente.Nombre,
+                        cliente.Apellido,
+                        DateTime.Now.AddYears(-30),
+                        cliente.TipoIdentificacion,
+                        cliente.DocumentoIdentidad,
+                        forceSoap: true);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo crear cliente externo vuelo");
+        }
+    }
+
+    private async Task ProcesarReservaMesaAsync(
+        CheckoutItem item,
+        Cliente cliente,
+        FacturaInfo facturaInfo,
+        Compra compra,
+        ReservaResult reservaResult,
+        ILogger log)
+    {
+        var (detalleRest, detalleSoap, servicio) = await ObtenerDetallesServicioAsync(item.ServicioId, log);
+
+        if (servicio is null)
+        {
+            reservaResult.Error = "Servicio no encontrado";
+            return;
+        }
+
+        if (!int.TryParse(item.IdProducto, out var idMesa))
+        {
+            reservaResult.Error = "Id de mesa invalido";
+            return;
+        }
+
+        var fecha = item.FechaInicio ?? DateTime.Today;
+        var personas = item.NumeroPersonas ?? 2;
+        bool usandoRest = false;
+
+        log.LogInformation("Procesando reserva mesa {IdMesa} en {Servicio}", idMesa, servicio.Nombre);
+
+        await CrearClienteExternoMesaAsync(detalleRest, detalleSoap, cliente, log);
+
+        string holdId = string.Empty;
+        Exception? ultimoError = null;
+
+        if (detalleRest is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleRest, detalleRest.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando prerreserva mesa (REST): {Uri}", uri);
+                    (holdId, _) = await MesasConnector.CrearPreReservaAsync(uri, idMesa, fecha, personas, 300);
+                    usandoRest = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "REST fallo para prerreserva mesa");
+                ultimoError = ex;
+            }
+        }
+
+        if (!usandoRest && detalleSoap is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleSoap, detalleSoap.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando prerreserva mesa (SOAP): {Uri}", uri);
+                    (holdId, _) = await MesasConnector.CrearPreReservaAsync(uri, idMesa, fecha, personas, 300, forceSoap: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "SOAP tambien fallo para prerreserva mesa");
+                ultimoError = ex;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(holdId))
+        {
+            reservaResult.Error = $"No se pudo crear prerreserva: {ultimoError?.Message ?? "Servicio no disponible"}";
+            return;
+        }
+
+        log.LogInformation("Prerreserva mesa creada ({Protocolo}): {HoldId}", usandoRest ? "REST" : "SOAP", holdId);
+
+        var detalle = usandoRest ? detalleRest! : detalleSoap!;
+        var uriReserva = BuildUri(detalle, detalle.CrearReservaEndpoint);
+        if (string.IsNullOrWhiteSpace(uriReserva))
+        {
+            reservaResult.Error = "Endpoint de reserva no configurado";
+            return;
+        }
+
+        var reserva = await MesasConnector.ConfirmarReservaAsync(
+            uriReserva,
+            idMesa,
+            holdId,
+            cliente.Nombre,
+            cliente.Apellido,
+            cliente.CorreoElectronico,
+            cliente.TipoIdentificacion,
+            cliente.DocumentoIdentidad,
+            fecha,
+            personas,
+            forceSoap: !usandoRest);
+
+        log.LogInformation("Reserva mesa confirmada: {IdReserva}", reserva.IdReserva);
+        reservaResult.CodigoReserva = reserva.IdReserva;
+
+        try
+        {
+            var uriFactura = BuildUri(detalle, detalle.GenerarFacturaEndpoint);
+            if (!string.IsNullOrWhiteSpace(uriFactura))
+            {
+                var nombreFactura = ResolveNombreFactura(cliente, facturaInfo);
+                var facturaUrl = await MesasConnector.GenerarFacturaAsync(
+                    uriFactura,
+                    reserva.IdReserva,
+                    facturaInfo.CorreoFactura,
+                    nombreFactura,
+                    facturaInfo.TipoDocumento,
+                    facturaInfo.Documento,
+                    item.PrecioFinal,
+                    forceSoap: !usandoRest);
+
+                reservaResult.FacturaProveedorUrl = facturaUrl;
+            }
+            else
+            {
+                log.LogWarning("No se pudo generar factura mesa: endpoint no configurado");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo generar factura mesa");
+        }
+
+        await PagarProveedorAsync(servicio, item.PrecioFinal, log);
+        await RegistrarReservaEnDbAsync(item.ServicioId, reserva.IdReserva, reservaResult.FacturaProveedorUrl, compra, item.PrecioFinal);
+
+        reservaResult.Exitoso = true;
+    }
+
+    private async Task CrearClienteExternoMesaAsync(DetalleServicio? rest, DetalleServicio? soap, Cliente cliente, ILogger log)
+    {
+        try
+        {
+            if (rest is not null)
+            {
+                try
+                {
+                    var uri = BuildUri(rest, rest.RegistrarClienteEndpoint);
+                    if (!string.IsNullOrWhiteSpace(uri))
+                    {
+                        await MesasConnector.CrearUsuarioAsync(uri, cliente.Nombre, cliente.Apellido, cliente.CorreoElectronico, cliente.TipoIdentificacion, cliente.DocumentoIdentidad);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "REST fallo al crear cliente externo mesa");
+                }
+            }
+
+            if (soap is not null)
+            {
+                var uri = BuildUri(soap, soap.RegistrarClienteEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    await MesasConnector.CrearUsuarioAsync(uri, cliente.Nombre, cliente.Apellido, cliente.CorreoElectronico, cliente.TipoIdentificacion, cliente.DocumentoIdentidad, forceSoap: true);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo crear cliente externo mesa");
+        }
+    }
+
+    private async Task ProcesarReservaPaqueteAsync(
+        CheckoutItem item,
+        Cliente cliente,
+        FacturaInfo facturaInfo,
+        Compra compra,
+        ReservaResult reservaResult,
+        ILogger log)
+    {
+        var (detalleRest, detalleSoap, servicio) = await ObtenerDetallesServicioAsync(item.ServicioId, log);
+
+        if (servicio is null)
+        {
+            reservaResult.Error = "Servicio no encontrado";
+            return;
+        }
+
+        var fechaInicio = item.FechaInicio ?? DateTime.Today;
+        var personas = item.NumeroPersonas ?? 1;
+        var bookingUserId = cliente.Id.ToString();
+        bool usandoRest = false;
+
+        log.LogInformation("Procesando reserva paquete {IdPaquete} en {Servicio}", item.IdProducto, servicio.Nombre);
+
+        await CrearClienteExternoPaqueteAsync(detalleRest, detalleSoap, cliente, bookingUserId, log);
+
+        string holdId = string.Empty;
+        Exception? ultimoError = null;
+
+        if (detalleRest is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleRest, detalleRest.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando hold paquete (REST): {Uri}", uri);
+                    (holdId, _) = await PaquetesConnector.CrearHoldAsync(uri, item.IdProducto, bookingUserId, fechaInicio, personas, 300);
+                    usandoRest = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "REST fallo para hold paquete");
+                ultimoError = ex;
+            }
+        }
+
+        if (!usandoRest && detalleSoap is not null)
+        {
+            try
+            {
+                var uri = BuildUri(detalleSoap, detalleSoap.CrearPrerreservaEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    log.LogInformation("Creando hold paquete (SOAP): {Uri}", uri);
+                    (holdId, _) = await PaquetesConnector.CrearHoldAsync(uri, item.IdProducto, bookingUserId, fechaInicio, personas, 300, forceSoap: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "SOAP tambien fallo para hold paquete");
+                ultimoError = ex;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(holdId))
+        {
+            reservaResult.Error = $"No se pudo crear prerreserva: {ultimoError?.Message ?? "Servicio no disponible"}";
+            return;
+        }
+
+        log.LogInformation("Hold paquete creado ({Protocolo}): {HoldId}", usandoRest ? "REST" : "SOAP", holdId);
+
+        var turistas = new (string, string, DateTime?, string, string)[]
+        {
+            (cliente.Nombre, cliente.Apellido, null, cliente.TipoIdentificacion, cliente.DocumentoIdentidad)
+        };
+
+        var detalle = usandoRest ? detalleRest! : detalleSoap!;
+        var uriReserva = BuildUri(detalle, detalle.CrearReservaEndpoint);
+        if (string.IsNullOrWhiteSpace(uriReserva))
+        {
+            reservaResult.Error = "Endpoint de reserva no configurado";
+            return;
+        }
+
+        var reserva = await PaquetesConnector.CrearReservaAsync(
+            uriReserva,
+            item.IdProducto,
+            holdId,
+            bookingUserId,
+            "TransferenciaBancaria",
+            turistas,
+            forceSoap: !usandoRest);
+
+        log.LogInformation("Reserva paquete creada: {IdReserva}", reserva.IdReserva);
+        reservaResult.CodigoReserva = reserva.CodigoReserva;
+
+        try
+        {
+            var uriFactura = BuildUri(detalle, detalle.GenerarFacturaEndpoint);
+            if (!string.IsNullOrWhiteSpace(uriFactura))
+            {
+                decimal subtotal = item.PrecioFinal;
+                decimal iva = subtotal * 0.12m;
+                decimal total = subtotal + iva;
+
+                var facturaUrl = await PaquetesConnector.EmitirFacturaAsync(uriFactura, reserva.IdReserva, subtotal, iva, total, forceSoap: !usandoRest);
+                reservaResult.FacturaProveedorUrl = facturaUrl;
+            }
+            else
+            {
+                log.LogWarning("No se pudo generar factura paquete: endpoint no configurado");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo emitir factura paquete");
+        }
+
+        await PagarProveedorAsync(servicio, item.PrecioFinal, log);
+        await RegistrarReservaEnDbAsync(item.ServicioId, reserva.CodigoReserva, reservaResult.FacturaProveedorUrl, compra, item.PrecioFinal);
+
+        reservaResult.Exitoso = true;
+    }
+
+    private async Task CrearClienteExternoPaqueteAsync(DetalleServicio? rest, DetalleServicio? soap, Cliente cliente, string bookingUserId, ILogger log)
+    {
+        try
+        {
+            if (rest is not null)
+            {
+                try
+                {
+                    var uri = BuildUri(rest, rest.RegistrarClienteEndpoint);
+                    if (!string.IsNullOrWhiteSpace(uri))
+                    {
+                        await PaquetesConnector.CrearUsuarioExternoAsync(uri, bookingUserId, cliente.Nombre, cliente.Apellido, cliente.CorreoElectronico);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "REST fallo al crear cliente externo paquete");
+                }
+            }
+
+            if (soap is not null)
+            {
+                var uri = BuildUri(soap, soap.RegistrarClienteEndpoint);
+                if (!string.IsNullOrWhiteSpace(uri))
+                {
+                    await PaquetesConnector.CrearUsuarioExternoAsync(uri, bookingUserId, cliente.Nombre, cliente.Apellido, cliente.CorreoElectronico, forceSoap: true);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "No se pudo crear cliente externo paquete");
+        }
+    }
+
+    private async Task PagarProveedorAsync(Servicio servicio, decimal precioFinal, ILogger log)
+    {
+        if (!int.TryParse(servicio.NumeroCuenta, out var cuentaProveedor))
+        {
+            log.LogWarning("Cuenta del proveedor no valida para servicio {ServicioId}", servicio.Id);
+            return;
+        }
+
+        var montoProveedor = precioFinal * (1 - COMISION_TRAVELIO);
+        var pagoExitoso = await TransferirClass.RealizarTransferenciaAsync(
+            cuentaDestino: cuentaProveedor,
+            monto: montoProveedor,
+            cuentaOrigen: TransferirClass.cuentaDefaultTravelio);
+
+        if (pagoExitoso)
+        {
+            log.LogInformation("Pago de ${Monto} realizado a {Servicio}", montoProveedor, servicio.Nombre);
+        }
+        else
+        {
+            log.LogWarning("No se pudo pagar a {Servicio}", servicio.Nombre);
+        }
+    }
+
+    private async Task RegistrarReservaEnDbAsync(int servicioId, string codigoReserva, string? facturaUrl, Compra compra, decimal precioFinal)
+    {
+        var comision = precioFinal * COMISION_TRAVELIO;
+        var valorNegocio = precioFinal - comision;
+
+        var reservaDb = new DbReserva
+        {
+            ServicioId = servicioId,
+            CodigoReserva = codigoReserva,
+            FacturaUrl = facturaUrl,
+            Activa = true,
+            ValorPagadoNegocio = valorNegocio,
+            ComisionAgencia = comision
+        };
+
+        _db.Reservas.Add(reservaDb);
+        await _db.SaveChangesAsync();
+
+        _db.ReservasCompra.Add(new ReservaCompra
+        {
+            CompraId = compra.Id,
+            ReservaId = reservaDb.Id
+        });
+    }
+
+    public async Task<CancelacionResult> CancelarReservaFrontendAsync(int reservaId, int clienteId, int cuentaBancariaCliente, ILogger? logger = null)
+    {
+        var resultado = new CancelacionResult();
+        var log = ResolveLogger(logger);
+
+        try
+        {
+            var reserva = await _db.Reservas
+                .Include(r => r.Servicio)
+                .FirstOrDefaultAsync(r => r.Id == reservaId);
+
+            if (reserva is null)
+            {
+                resultado.Mensaje = "Reserva no encontrada.";
+                return resultado;
+            }
+
+            var reservaCompra = await _db.ReservasCompra
+                .Include(rc => rc.Compra)
+                .FirstOrDefaultAsync(rc => rc.ReservaId == reservaId && rc.Compra.ClienteId == clienteId);
+
+            if (reservaCompra is null)
+            {
+                resultado.Mensaje = "No tienes permiso para cancelar esta reserva.";
+                return resultado;
+            }
+
+            var detalleRest = await _db.DetallesServicio
+                .FirstOrDefaultAsync(d => d.ServicioId == reserva.ServicioId && d.TipoProtocolo == TipoProtocolo.Rest);
+
+            if (detalleRest is null || string.IsNullOrWhiteSpace(detalleRest.CancelarReservaEndpoint))
+            {
+                resultado.Mensaje = "Este proveedor no soporta cancelaciones (solo disponible via REST).";
+                return resultado;
+            }
+
+            var uriCancelar = BuildUri(detalleRest, detalleRest.CancelarReservaEndpoint);
+            if (string.IsNullOrWhiteSpace(uriCancelar))
+            {
+                resultado.Mensaje = "No se pudo construir el endpoint de cancelacion.";
+                return resultado;
+            }
+
+            bool exito = false;
+            decimal valorReembolsado = 0m;
+
+            log.LogInformation("Cancelando reserva {ReservaId} en {Servicio} via REST", reservaId, reserva.Servicio.Nombre);
+
+            switch (reserva.Servicio.TipoServicio)
+            {
+                case TipoServicio.RentaVehiculos:
+                    (exito, valorReembolsado) = await AutosConnector.CancelarReservaAsync(uriCancelar, reserva.CodigoReserva);
+                    break;
+                case TipoServicio.Hotel:
+                    (exito, valorReembolsado) = await HabitacionesConnector.CancelarReservaAsync(uriCancelar, reserva.CodigoReserva);
+                    break;
+                case TipoServicio.Aerolinea:
+                    (exito, valorReembolsado) = await AerolineaConnector.CancelarReservaAsync(uriCancelar, reserva.CodigoReserva);
+                    break;
+                case TipoServicio.Restaurante:
+                    (exito, valorReembolsado) = await MesasConnector.CancelarReservaAsync(uriCancelar, reserva.CodigoReserva);
+                    break;
+                case TipoServicio.PaquetesTuristicos:
+                    (exito, valorReembolsado) = await PaquetesConnector.CancelarReservaAsync(uriCancelar, reserva.CodigoReserva);
+                    break;
+                default:
+                    resultado.Mensaje = "Tipo de servicio no soportado para cancelacion.";
+                    return resultado;
+            }
+
+            if (exito)
+            {
+                if (valorReembolsado > 0)
+                {
+                    var reembolsoExitoso = await TransferirClass.RealizarTransferenciaAsync(
+                        cuentaDestino: cuentaBancariaCliente,
+                        monto: valorReembolsado,
+                        cuentaOrigen: TransferirClass.cuentaDefaultTravelio);
+
+                    if (reembolsoExitoso)
+                    {
+                        log.LogInformation("Reembolso de ${Monto} realizado al cliente", valorReembolsado);
+                    }
+                }
+
+                reserva.Activa = false;
+                await _db.SaveChangesAsync();
+
+                resultado.Exitoso = true;
+                resultado.MontoReembolsado = valorReembolsado;
+                resultado.Mensaje = $"Reserva cancelada exitosamente. Se reembolsaron ${valorReembolsado:N2}";
+            }
+            else
+            {
+                resultado.Mensaje = "No se pudo cancelar la reserva en el proveedor.";
+            }
+
+            return resultado;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error cancelando reserva {ReservaId}", reservaId);
+            resultado.Mensaje = "Error al cancelar la reserva.";
+            return resultado;
+        }
+    }
 
     #endregion
 
@@ -2484,6 +4168,221 @@ public class TravelioIntegrationService
 
     public DbReserva? ObtenerReservaPorId(int reservaId, ILogger? logger = null) =>
         ObtenerReservaPorIdAsync(reservaId, logger).GetAwaiter().GetResult();
+
+    #endregion
+
+    #region Consultas frontend
+
+    public async Task<IReadOnlyList<Compra>?> ObtenerComprasPorClienteAsync(int clienteId, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            return await _db.Compras
+                .Include(c => c.ReservasCompra)
+                    .ThenInclude(rc => rc.Reserva)
+                        .ThenInclude(r => r.Servicio)
+                .Where(c => c.ClienteId == clienteId)
+                .OrderByDescending(c => c.FechaCompra)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener compras del cliente {ClienteId}", clienteId);
+            return null;
+        }
+    }
+
+    public async Task<Compra?> ObtenerCompraConReservasAsync(int compraId, int? clienteId = null, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var query = _db.Compras
+                .Include(c => c.Cliente)
+                .Include(c => c.ReservasCompra)
+                    .ThenInclude(rc => rc.Reserva)
+                        .ThenInclude(r => r.Servicio)
+                .Where(c => c.Id == compraId);
+
+            if (clienteId.HasValue)
+            {
+                query = query.Where(c => c.ClienteId == clienteId.Value);
+            }
+
+            return await query.FirstOrDefaultAsync();
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener compra {CompraId}", compraId);
+            return null;
+        }
+    }
+
+    public async Task<IReadOnlyList<Cliente>?> ObtenerClientesAsync(ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            return await _db.Clientes.ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener clientes");
+            return null;
+        }
+    }
+
+    public async Task<IReadOnlyList<Compra>?> ObtenerComprasAsync(ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            return await _db.Compras
+                .Include(c => c.Cliente)
+                .Include(c => c.ReservasCompra)
+                    .ThenInclude(rc => rc.Reserva)
+                        .ThenInclude(r => r.Servicio)
+                .OrderByDescending(c => c.FechaCompra)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener compras");
+            return null;
+        }
+    }
+
+    public async Task<IReadOnlyList<DbReserva>?> ObtenerReservasAsync(ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            return await _db.Reservas
+                .Include(r => r.Servicio)
+                .Include(r => r.ReservasCompra)
+                    .ThenInclude(rc => rc.Compra)
+                        .ThenInclude(c => c.Cliente)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener reservas");
+            return null;
+        }
+    }
+
+    public async Task<IReadOnlyList<Servicio>?> ObtenerServiciosActivosAsync(ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            return await _db.Servicios
+                .Include(s => s.DetallesServicio)
+                .Where(s => s.Activo)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener servicios activos");
+            return null;
+        }
+    }
+
+    public async Task<(decimal hoy, decimal semana, decimal mes)?> ObtenerEstadisticasComprasAsync(ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var hoy = await _db.Compras
+                .Where(c => c.FechaCompra.Date == DateTime.Today)
+                .Select(c => c.ValorPagado)
+                .DefaultIfEmpty(0m)
+                .SumAsync();
+
+            var semana = await _db.Compras
+                .Where(c => c.FechaCompra >= DateTime.Today.AddDays(-7))
+                .Select(c => c.ValorPagado)
+                .DefaultIfEmpty(0m)
+                .SumAsync();
+
+            var mes = await _db.Compras
+                .Where(c => c.FechaCompra >= DateTime.Today.AddMonths(-1))
+                .Select(c => c.ValorPagado)
+                .DefaultIfEmpty(0m)
+                .SumAsync();
+
+            return (hoy, semana, mes);
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al obtener estad\u00edsticas de compras");
+            return null;
+        }
+    }
+
+    public async Task<bool?> MarcarReservaComoCanceladaAsync(int reservaId, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var reserva = await _db.Reservas.FindAsync(reservaId);
+            if (reserva is null) return false;
+
+            reserva.Activa = false;
+            await _db.SaveChangesAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al marcar reserva {ReservaId} como cancelada", reservaId);
+            return null;
+        }
+    }
+
+    public async Task<IReadOnlyList<ProveedorStatus>?> VerificarProveedoresAsync(int servicioId, ILogger? logger = null)
+    {
+        var log = ResolveLogger(logger);
+        try
+        {
+            var detalles = await _db.DetallesServicio
+                .Where(d => d.ServicioId == servicioId)
+                .ToListAsync();
+
+            var resultados = new List<ProveedorStatus>();
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+
+            foreach (var detalle in detalles)
+            {
+                var url = BuildUri(detalle, detalle.ObtenerProductosEndpoint);
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    resultados.Add(new ProveedorStatus(detalle.TipoProtocolo.ToString(), string.Empty, false, "URL no configurada"));
+                    continue;
+                }
+
+                try
+                {
+                    var response = await httpClient.GetAsync(url);
+                    var disponible = response.IsSuccessStatusCode;
+                    var mensaje = disponible ? "OK" : $"Error: {response.StatusCode}";
+                    resultados.Add(new ProveedorStatus(detalle.TipoProtocolo.ToString(), url, disponible, mensaje));
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(ex, "Error verificando proveedor {ServicioId} ({Protocolo})", servicioId, detalle.TipoProtocolo);
+                    resultados.Add(new ProveedorStatus(detalle.TipoProtocolo.ToString(), url, false, $"Error: {ex.Message}"));
+                }
+            }
+
+            return resultados;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error al verificar proveedores del servicio {ServicioId}", servicioId);
+            return null;
+        }
+    }
 
     #endregion
 }

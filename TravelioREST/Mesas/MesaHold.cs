@@ -5,6 +5,14 @@ using System.Text;
 
 namespace TravelioREST.Mesas;
 
+//public class MesaHoldRequest
+//{
+//    public string id_mesa { get; set; }
+//    public DateTime fecha { get; set; }
+//    public int numero_clientes { get; set; }
+//    public int duracionHoldSegundos { get; set; }
+//}
+
 public class MesaHoldRequest
 {
     public string id_mesa { get; set; }
@@ -15,9 +23,19 @@ public class MesaHoldRequest
 
 public class MesaHoldResponse
 {
-    public string id_hold { get; set; }
+    public string idHold { get; set; }
+    public string idMesa { get; set; }
+    public DateTime fechaReserva { get; set; }
+    public int numeroPersonas { get; set; }
+    public int duracionHoldSegundos { get; set; }
     public string mensaje { get; set; }
 }
+
+//public class MesaHoldResponse
+//{
+//    public string id_hold { get; set; }
+//    public string mensaje { get; set; }
+//}
 
 public static class MesaHold
 {

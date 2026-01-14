@@ -31,37 +31,7 @@ public static class Connector
     {
         if (IsREST && !forceSoap)
         {
-            var uriBuilder = new UriBuilder(uri);
-
-            var query = HttpUtility.ParseQueryString(uriBuilder.Query);
-
-            if (!string.IsNullOrEmpty(categoria))
-                query["categoria"] = categoria;
-
-            if (!string.IsNullOrEmpty(transmision))
-                query["transmision"] = transmision;
-
-            if (capacidad is not null)
-                query["capacidad"] = capacidad.ToString();
-
-            if (precioMin is not null)
-                query["precio_min"] = precioMin.ToString();
-
-            if (precioMax is not null)
-                query["precio_max"] = precioMax.ToString();
-
-            if (!string.IsNullOrEmpty(sort))
-                query["sort"] = sort;
-
-            if (!string.IsNullOrEmpty(ciudad))
-                query["ciudad"] = ciudad;
-
-            if (!string.IsNullOrEmpty(pais))
-                query["pais"] = pais;
-
-            uriBuilder.Query = query.ToString();
-
-            var response = await AutosGetter.GetAutosAsync(uriBuilder.ToString());
+            var response = await AutosGetter.GetAutosAsync(uri, categoria, transmision, capacidad, precioMin, precioMax, sort, ciudad, pais);
 
             var result = new Vehiculo[response.Data.Length];
 
@@ -133,7 +103,6 @@ public static class Connector
     {
         if (IsREST && !forceSoap)
         {
-            // Modificado en V2 (¡¿POR QUÉ?!)
             var uriBuilder = new UriBuilder(uri);
 
             var query = HttpUtility.ParseQueryString(uriBuilder.Query);

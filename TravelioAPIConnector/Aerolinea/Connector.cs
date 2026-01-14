@@ -23,20 +23,20 @@ public static class Connector
     {
         if (IsREST && !forceSoap)
         {
-            var vuelosRest = await VuelosGetter.GetVuelosAsync(uri, origen, destino, fechaDespegue, fechaLlegada, tipoCabina, pasajeros);
+            var vuelosRest = await VuelosGetter.GetVuelosAsync(uri, origen, destino, fechaDespegue, fechaLlegada, tipoCabina, pasajeros, precioMin, precioMax);
 
             return Array.ConvertAll(vuelosRest, v => new Vuelo(
-                v.IdVuelo.ToString(),
-                v.Origen ?? string.Empty,
-                v.Destino ?? string.Empty,
-                v.FechaSalida,
-                v.TipoCabina ?? string.Empty,
-                v.NombreAerolinea ?? string.Empty,
-                v.Pasajeros,
-                v.CapacidadDisponible,
-                v.PrecioNormal,
-                v.PrecioActual,
-                v.PrecioNormal == 0 ? 0 : (1 - (v.PrecioActual / v.PrecioNormal)) * 100m));
+                v.idVuelo ?? string.Empty,
+                v.origen ?? string.Empty,
+                v.destino ?? string.Empty,
+                v.fecha,
+                v.tipoCabina ?? string.Empty,
+                v.nombreAerolinea ?? string.Empty,
+                v.capacidadPasajeros,
+                v.capacidadActual,
+                v.precioNormal,
+                v.precioActual,
+                v.precioNormal == 0 ? 0 : (1 - (v.precioActual / v.precioNormal)) * 100m));
         }
 
         var client = new IntegracionServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -61,12 +61,7 @@ public static class Connector
     {
         if (IsREST && !forceSoap)
         {
-            if (!int.TryParse(idVuelo, out var vueloId))
-            {
-                throw new FormatException($"El id de vuelo {idVuelo} no es un entero v\u00e1lido para la API REST.");
-            }
-
-            return await VueloCheckAvailable.GetDisponibilidadAsync(uri, vueloId, pasajeros);
+            return await VueloCheckAvailable.GetDisponibilidadAsync(uri, idVuelo, pasajeros);
         }
 
         var client = new IntegracionServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -82,16 +77,9 @@ public static class Connector
     {
         if (IsREST && !forceSoap)
         {
-            if (!int.TryParse(idVuelo, out var vueloId))
-            {
-                throw new FormatException($"El id de vuelo {idVuelo} no es un entero v\u00e1lido para la API REST.");
-            }
-
-            var hold = await HoldCreator.CreateHoldAsync(uri, vueloId, pasajeros.Length, duracionHold);
-            var expira = DateTime.TryParse(hold.expiraEn, out var parsedExpira)
-                ? parsedExpira
-                : DateTime.UtcNow.AddSeconds(duracionHold);
-            return (hold.holdId, expira);
+            var hold = await HoldCreator.CreateHoldAsync(uri, idVuelo, pasajeros, duracionHold);
+            var holdData = hold.data ?? throw new InvalidOperationException("No se pudo crear la prerreserva.");
+            return (holdData.idHold ?? string.Empty, holdData.expiresAt);
         }
 
         var client = new IntegracionServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -119,14 +107,9 @@ public static class Connector
     {
         if (IsREST && !forceSoap)
         {
-            if (!int.TryParse(idVuelo, out var vueloId))
-            {
-                throw new FormatException($"El id de vuelo {idVuelo} no es un entero v\u00e1lido para la API REST.");
-            }
-
-            var pasajerosRest = pasajeros.Select(p => (p.nombre, p.apellido, p.tipoIdentificacion, p.identificacion)).ToArray();
-            var reservaRest = await ReservationCreator.CreateReservationAsync(uri, vueloId, idHold, correo, pasajerosRest);
-            return (reservaRest.IdReserva.ToString(), reservaRest.CodigoReserva, reservaRest.Estado);
+            var reservaRest = await ReservationCreator.CreateReservationAsync(uri, idVuelo, idHold, correo, pasajeros);
+            var reservaData = reservaRest.data ?? throw new InvalidOperationException("No se pudo crear la reserva.");
+            return (reservaData.idReserva ?? string.Empty, reservaData.codigoReserva ?? string.Empty, reservaData.mensaje ?? string.Empty);
         }
 
         var client = new IntegracionServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -157,13 +140,9 @@ public static class Connector
     {
         if (IsREST && !forceSoap)
         {
-            if (!int.TryParse(idReserva, out var reservaId))
-            {
-                throw new FormatException($"El id de reserva {idReserva} no es un entero v\u00e1lido para la API REST.");
-            }
-
-            var factura = await InvoiceGenerator.GenerateInvoiceAsync(uri, reservaId, subtotal, iva, total, (cliente.nombre, cliente.documento, cliente.correo));
-            return factura.UriFactura ?? throw new InvalidOperationException("La API REST de aerol\u00edneas no devolvi\u00f3 el enlace de la factura.");
+            var factura = await InvoiceGenerator.GenerateInvoiceAsync(uri, idReserva, subtotal, iva, total, cliente, idTransaccionBanco);
+            var facturaData = factura.data ?? throw new InvalidOperationException("La API REST de aerol\u00edneas no devolvi\u00f3 el enlace de la factura.");
+            return facturaData.uriFactura ?? throw new InvalidOperationException("La API REST de aerol\u00edneas no devolvi\u00f3 el enlace de la factura.");
         }
 
         var client = new IntegracionServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -191,8 +170,9 @@ public static class Connector
     {
         if (IsREST && !forceSoap)
         {
-            var restClient = await ExternalClientCreator.CreateExternalClientAsync(uri, nombre, apellido, correo);
-            return restClient.IdUsuario.ToString();
+            var restClient = await ExternalClientCreator.CreateExternalClientAsync(uri, correo, nombre, apellido, fechaNacimiento, tipoIdentificacion, identificacion);
+            var clientData = restClient.data ?? throw new InvalidOperationException("No se pudo crear el usuario externo.");
+            return clientData.idUsuario.ToString();
         }
 
         var client = new IntegracionServiceSoapClient(GetBinding(uri), new EndpointAddress(uri));
@@ -210,19 +190,20 @@ public static class Connector
             }
 
             var datos = await ReservationDataGetter.GetReservationDataAsync(uri, reservaId);
-            var pasajeros = datos.Pasajeros ?? Array.Empty<PasajeroReservaInfo>();
+            var reservaData = datos.data ?? throw new InvalidOperationException("No se pudo obtener la reserva.");
+            var pasajeros = reservaData.pasajeros ?? Array.Empty<PasajeroReservaDataResponse>();
             return new Reserva(
-                datos.IdReserva.ToString(),
-                datos.Origen ?? string.Empty,
-                datos.Destino ?? string.Empty,
-                datos._links?.self ?? string.Empty,
-                datos.Fecha,
-                datos.TipoCabina ?? string.Empty,
-                Array.ConvertAll(pasajeros, p => (p.NombreCompleto ?? string.Empty, string.Empty, string.Empty, p.Documento ?? string.Empty)),
-                datos.Aerolinea ?? string.Empty,
-                datos.AsientosReservados,
-                0m,
-                datos._links?.factura ?? string.Empty,
+                reservaData.idReserva ?? string.Empty,
+                reservaData.origen ?? string.Empty,
+                reservaData.destino ?? string.Empty,
+                reservaData.correo ?? string.Empty,
+                reservaData.fecha,
+                reservaData.tipoCabina ?? string.Empty,
+                Array.ConvertAll(pasajeros, p => (p.nombre ?? string.Empty, p.apellido ?? string.Empty, p.tipoIdentificacion ?? string.Empty, p.identificacion ?? string.Empty)),
+                reservaData.nombreAerolinea ?? string.Empty,
+                reservaData.asientosReservados,
+                reservaData.valorPagado,
+                reservaData.uriFactura ?? string.Empty,
                 string.Empty);
         }
 
@@ -248,12 +229,8 @@ public static class Connector
 
     public static async Task<(bool exito, decimal valorPagado)> CancelarReservaAsync(string uri, string idReserva)
     {
-        if (!int.TryParse(idReserva, out var reservaId))
-        {
-            throw new FormatException($"El id de reserva {idReserva} no es un entero v\u00e1lido para la API REST.");
-        }
-
-        var resultado = await CancelarReservaVuelos.CancelarReservaAsync(uri, reservaId);
-        return (resultado.Success, resultado.TotalPagado);
+        var resultado = await CancelarReservaVuelos.CancelarReservaAsync(uri, idReserva);
+        var resultadoData = resultado.data;
+        return (resultadoData?.cancelado ?? false, resultadoData?.valorPagado ?? 0);
     }
 }

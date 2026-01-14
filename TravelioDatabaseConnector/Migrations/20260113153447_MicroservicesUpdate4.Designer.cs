@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TravelioDatabaseConnector.Data;
 
@@ -11,9 +12,11 @@ using TravelioDatabaseConnector.Data;
 namespace TravelioDatabaseConnector.Migrations
 {
     [DbContext(typeof(TravelioDbContext))]
-    partial class TravelioDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260113153447_MicroservicesUpdate4")]
+    partial class MicroservicesUpdate4
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -971,7 +974,7 @@ namespace TravelioDatabaseConnector.Migrations
                             RegistrarClienteEndpoint = "/usuarios/externos",
                             ServicioId = 105,
                             TipoProtocolo = "Rest",
-                            UriBase = "http://23.230.3.250:5000/api/integracion"
+                            UriBase = "http://23.230.3.250:8080/api/integracion"
                         },
                         new
                         {

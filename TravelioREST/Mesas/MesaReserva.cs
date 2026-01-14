@@ -5,6 +5,19 @@ using System.Text;
 
 namespace TravelioREST.Mesas;
 
+//public class MesaReservaRequest
+//{
+//    public string id_mesa { get; set; }
+//    public string id_hold { get; set; }
+//    public string nombre { get; set; }
+//    public string apellido { get; set; }
+//    public string correo { get; set; }
+//    public string tipo_identificacion { get; set; } = "Cedula";
+//    public string identificacion { get; set; }
+//    public DateTime fecha { get; set; }
+//    public int personas { get; set; }
+//}
+
 public class MesaReservaRequest
 {
     public string id_mesa { get; set; }
@@ -18,13 +31,30 @@ public class MesaReservaRequest
     public int personas { get; set; }
 }
 
+//public class MesaReservaResponse
+//{
+//    public string idReserva { get; set; }
+//    public decimal valor_pagado { get; set; }
+//    public string uri_factura { get; set; }
+//    public string mensaje { get; set; }
+//}
+
 public class MesaReservaResponse
 {
-    public string idReserva { get; set; }
-    public decimal valor_pagado { get; set; }
-    public string uri_factura { get; set; }
     public string mensaje { get; set; }
+    public string idReserva { get; set; }
+    public string idMesa { get; set; }
+    public string nombreCliente { get; set; }
+    public string apellidoCliente { get; set; }
+    public string correo { get; set; }
+    public string tipoIdentificacion { get; set; }
+    public string identificacion { get; set; }
+    public DateTime fechaReserva { get; set; }
+    public int numeroPersonas { get; set; }
+    public decimal valorPagado { get; set; }
+    public string uriFactura { get; set; }
 }
+
 
 public static class MesaReserva
 {
